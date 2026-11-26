@@ -158,7 +158,7 @@ function onHostEvent({key,message,prompt,usage,sentInputs,step,delta,thread,appr
     return;
   }
   if(delta!=null){drafts.set(key,delta);refreshLive(job.s,job.id,true);return}
-  if(thread){(f.threads??={})[job.id]=thread;save(job.s);return}
+  if(thread)(f.threads??={})[job.id]=thread;
   if(step){upsertStep(f,job.id,step,now);save(job.s);refreshLive(job.s,job.id);if(job.s===session())graph();return}
   if(usage)(f.usage??={})[job.id]=usage;
   else if(prompt){(f.prompts??={})[job.id]=prompt;if(sentInputs)(f.sentInputs??={})[job.id]=sentInputs}

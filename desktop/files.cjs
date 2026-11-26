@@ -15,6 +15,20 @@ async function atomicAsync(file,data,seq){
 }
 function atomicNow(file,data,seq){if(seq<newest)return false;newest=seq;atomic(file,data);return true}
 function read(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf8'))}catch(e){if(e.code==='ENOENT')return fallback;throw e}}
+async function previewText(file){
+  const handle=await fsp.open(file);
+  try{
+    const stat=await handle.stat();
+    if(!stat.isFile())throw Error(uiText('无法读取本地文件'));
+    const buffer=Buffer.alloc(Math.min(1024*1024,stat.size));
+    const {bytesRead}=await handle.read(buffer);
+    return buffer.toString('utf8',0,bytesRead)+(stat.size>buffer.length?uiText('\n…（预览前 1 MiB）'):'');
+  }finally{await handle.close()}
+}
+async function imageNames(directory){
+  const entries=await fsp.readdir(directory,{withFileTypes:true});
+  return entries.filter(e=>e.isFile()&&mime[path.extname(e.name).toLowerCase()]?.startsWith('image/')).map(e=>e.name).sort();
+}
 class Files{
   constructor(base){
     this.base=base;this.indexFile=path.join(base,'artifacts.json');this.index=read(this.indexFile,{});
@@ -136,7 +150,7 @@ class Files{
   async preview(id){
     const r=await this.get(id),url='relay-asset://file/'+r.id;
     if(!['text/markdown','text/plain','application/json'].includes(r.type))return {type:r.type,url};
-    const handle=await fsp.open(r.path);let text;try{const buffer=Buffer.alloc(Math.min(1024*1024,r.bytes));const part=await handle.read(buffer);text=buffer.toString('utf8',0,part.bytesRead)+(r.bytes>buffer.length?uiText('\n…（预览前 1 MiB）'):'')}finally{await handle.close()}
+    const text=await previewText(r.path);
     if(r.type!=='text/markdown')return {type:'text',text};
     const md=require('markdown-it')({html:false,linkify:false});
     const lookup=src=>{try{const target=path.resolve(path.dirname(r.path),decodeURIComponent(src));return Object.values(this.index).find(v=>v.root===r.root&&v.path===target)}catch{return null}};
@@ -169,4 +183,4 @@ class Files{
     }catch{return new Response(null,{status:404})}
   }
 }
-module.exports={Files,atomic,atomicAsync,atomicNow,read};
+module.exports={Files,atomic,atomicAsync,atomicNow,read,previewText,imageNames};

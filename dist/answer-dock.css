@@ -156,6 +156,60 @@
 .dock-image button:hover { border-color: var(--dock-muted) }
 .dock-image img { display: block; width: 100%; max-height: 72vh; object-fit: contain }
 .dock-image figcaption { margin: 6px 0 0; font-size: 12px; color: var(--dock-muted) }
+.dock-project-deliveries:empty { display: none }
+.dock-project-preview {
+  margin: 24px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--dock-rule);
+}
+.dock-project-preview > header, .dock-test-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+.dock-project-preview h4 { margin: 0; font-size: 17px }
+.dock-project-preview header button { color: var(--dock-muted); font-size: 12px; text-decoration: underline }
+.dock-project-preview .md h1 { font-size: 16px }
+.dock-project-preview .md h2 { font-size: 15px; margin: 18px 0 4px }
+.dock-project-preview .md table:has(img) {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  margin: 10px 0 18px;
+  font-size: 13px;
+}
+.dock-project-preview .md table:has(img) th:first-child { width: 22% }
+.dock-project-preview .md table:has(img) td, .dock-project-preview .md table:has(img) th {
+  padding: 5px;
+  vertical-align: top;
+  border-color: var(--dock-rule);
+}
+.dock-inline-image {
+  display: inline-block;
+  width: 100%;
+  padding: 0;
+  border-radius: 5px;
+  vertical-align: top;
+  cursor: zoom-in;
+}
+.dock-project-preview .dock-inline-image img { width: 100%; margin: 0 }
+.dock-project-preview td img { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; margin: 0 }
+.dock-inline-image + .dock-inline-caption { font-size: 12px; color: var(--dock-muted) }
+.dock-project-preview td .dock-inline-caption { display: none }
+.dock-inline-image span { display: block; font-size: 12px; color: var(--dock-muted) }
+.dock-test { padding: 12px 0; border-bottom: 1px solid var(--dock-rule); font-size: 13px }
+.dock-test p { margin: 5px 0 0; color: var(--dock-muted); line-height: 1.55 }
+.dock-test-exit, .dock-test-data summary { color: var(--dock-muted); font-size: 12px }
+.dock-test-data summary { cursor: pointer; margin: 10px 0 }
+.dock-test-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr));
+  gap: 12px;
+  margin: 10px 0 0;
+}
+.dock-test-images img { aspect-ratio: 16 / 9 }
 .dock-media h3 { font-size: 14px; margin: 0 0 10px }
 #answer .result-attachments { margin-top: 15px; grid-template-columns: 1fr }
 #answer .dock-media .result-attachments { grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); align-items: start }

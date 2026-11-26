@@ -4,32 +4,48 @@ function linkedFile(token,attribute,env){
   let dest;try{dest=decodeURIComponent(raw)}catch{return}
   return (env.assets||[]).find(a=>a.path===dest||a.name===dest||'out/'+a.name===dest||'./'+a.name===dest);
 }
+function localProjectHref(href){return href&&!/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href)}
+function projectHref(href,env){return env.base&&localProjectHref(href)&&!href.startsWith('/')?env.base+'/'+href:href}
 function projectImage(href,project){
-  if(!host||!project||!href||/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href))return null;
+  if(!host||!project||!localProjectHref(href))return null;
   let path;try{path=decodeURIComponent(href.split(/[?#]/)[0])}catch{return null}
   if(!/\.(?:png|jpe?g|gif|webp|avif)$/i.test(path))return null;
   return {url:'relay-asset://project/'+encodeURIComponent(project)+'?path='+encodeURIComponent(href),name:path.split('/').pop()};
 }
+function inlineProjectImage(image,label=''){
+  return '<button type="button" class="dock-inline-image" data-project-image aria-label="'+esc(uiText('放大 ')+image.name)+'">'+
+    '<img src="'+esc(image.url)+'" alt="'+esc(image.name)+'" loading="lazy">'+label+'</button>';
+}
 answerMd.renderer.rules.link_open=(tokens,i,options,env)=>{
-  const t=tokens[i],asset=linkedFile(t,'href',env),href=t.attrGet('href')||'';
+  const t=tokens[i],asset=linkedFile(t,'href',env),href=projectHref(t.attrGet('href')||'',env);
   const image=asset?.type.startsWith('image/')?{asset,url:'relay-asset://file/'+asset.id,name:asset.name}:projectImage(href,env.project);
-  env.imageLink=!!(env.previews&&image);
-  if(env.imageLink){
+  env.linkEnd='</a>';
+  if(env.inlineProjectImages&&image&&!(tokens[i+1]?.type==='image'&&tokens[i+2]?.type==='link_close')){
+    env.inlineProjectImages.add(image.url);
+    env.linkEnd='</span>';
+    return inlineProjectImage(image)+'<span class="dock-inline-caption">';
+  }
+  if(env.previews&&image){
     env.previews.links.set(image.url,image);
+    env.linkEnd='</span>';
     return '<span>';
   }
   if(asset)return '<a href="#" data-asset="'+esc(asset.id)+'">';
   // In a project delivery, relative links point at files in the project directory.
-  if(env.project&&href&&!/^[a-z][a-z0-9+.-]*:\/\//i.test(href)&&!href.startsWith('#'))return '<a href="#" data-project-file="'+esc(href)+'" data-project-id="'+esc(env.project)+uiText('" title="打开 ')+esc(href)+'">';
+  if(env.project&&localProjectHref(href))return '<a href="#" data-project-file="'+esc(href)+'" data-project-id="'+esc(env.project)+uiText('" title="打开 ')+esc(href)+'">';
   return /^https?:\/\//i.test(href)?'<a target="_blank" rel="noopener noreferrer" href="'+esc(href)+'">':'<a>';
 };
 answerMd.renderer.rules.link_close=(_tokens,_i,_options,env)=>{
-  if(!env.imageLink)return '</a>';
-  env.imageLink=false;return '</span>';
+  const end=env.linkEnd||'</a>';delete env.linkEnd;return end;
 };
 answerMd.renderer.rules.image=(tokens,i,options,env)=>{
   const token=tokens[i],alt=esc(token.content),item=linkedFile(token,'src',env);
-  const url=host&&item?.type.startsWith('image/')?'relay-asset://file/'+item.id:projectImage(token.attrGet('src'),env.project)?.url;
+  const photo=projectImage(projectHref(token.attrGet('src'),env),env.project);
+  if(env.inlineProjectImages&&photo){
+    env.inlineProjectImages.add(photo.url);
+    if(!env.linkEnd)return inlineProjectImage(photo,'<span>'+alt+'</span>');
+  }
+  const url=host&&item?.type.startsWith('image/')?'relay-asset://file/'+item.id:photo?.url;
   if(!url)return alt;
   env.previews?.embedded.add(url);
   return '<img src="'+esc(url)+'" alt="'+alt+'" loading="lazy">';
@@ -38,6 +54,47 @@ function richAnswer(body,assets=[],project='',previews){return '<div class="answ
 function answerImage({url,name,asset}){
   return '<figure class="dock-image"><button type="button" '+(asset?'data-asset="'+esc(asset.id)+'"':'data-project-image')+
     ' aria-label="'+esc(uiText('放大 ')+name)+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy"></button><figcaption>'+esc(name)+'</figcaption></figure>';
+}
+function testReport(doc,project,shown){
+  const section=doc.tests.map(test=>{
+    const images=test.images.map(href=>projectImage(href,project)).filter(Boolean);
+    // Keep a replay sequence together if any of its frames are absent from the other previews.
+    const gallery=images.some(image=>!shown.has(image.url))?images:[];
+    for(const image of gallery)shown.add(image.url);
+    const status=test.exit===null?'':'<span class="dock-test-exit">'+uiText('退出码')+' '+esc(test.exit)+'</span>';
+    return '<section class="dock-test"><div class="dock-test-head"><strong>'+esc(test.name)+'</strong>'+status+'</div>'+
+      (test.output?'<p>'+esc(test.output)+'</p>':'')+
+      (gallery.length?'<div class="dock-test-images">'+gallery.map(answerImage).join('')+'</div>':'')+'</section>';
+  }).join('');
+  return section+(section?'<details class="dock-test-data"><summary>'+uiText('完整实测数据')+'</summary>':'')+
+    '<pre class="output">'+esc(doc.text)+'</pre>'+(section?'</details>':'');
+}
+async function fillProjectDeliveries(container){
+  const article=container.parentElement,links=article.querySelectorAll('.answer-md a[data-project-file]');
+  const targets=new Map();
+  for(const link of links){
+    const href=link.dataset.projectFile;
+    if(!/\.(?:md|markdown|json)(?:[?#].*)?$/i.test(href))continue;
+    const source=targets.get(href)||{href,name:link.textContent,project:link.dataset.projectId,links:[]};
+    source.links.push(link);targets.set(href,source);
+  }
+  const documents=(await Promise.allSettled([...targets.values()].map(async source=>{
+    const data=await host.projectPreview(source.project,source.href);
+    return data&&{...source,...data};
+  }))).flatMap(result=>result.status==='fulfilled'&&result.value?[result.value]:[]);
+  if(!container.isConnected)return;
+  const shown=new Set(),markdown=[];
+  for(const doc of documents.filter(doc=>doc.type==='markdown')){
+    const pictures=new Set();
+    const html=answerMd.render(doc.text,{project:doc.project,base:doc.base,inlineProjectImages:pictures});
+    for(const url of pictures)shown.add(url);
+    markdown.push({...doc,html,count:pictures.size});
+  }
+  const ordered=[...documents.filter(doc=>doc.type==='json'),...markdown.sort((a,b)=>b.count-a.count)];
+  for(const doc of ordered)for(const link of doc.links)link.replaceWith(document.createTextNode(link.textContent));
+  container.innerHTML=ordered.map(doc=>'<section class="dock-project-preview"><header><h4>'+esc(doc.name)+'</h4>'+
+    '<button type="button" data-project-file="'+esc(doc.href)+'" data-project-id="'+esc(doc.project)+'">'+uiText('打开原文件')+'</button></header>'+
+    (doc.type==='json'?testReport(doc,doc.project,shown):'<div class="answer-md md">'+doc.html+'</div>')+'</section>').join('');
 }
 function mediaBlock(a){
   const url='relay-asset://file/'+esc(a.id);
@@ -122,7 +179,7 @@ function replyArticle(k){
   const attachments=assets.length?'<div class="result-attachments">'+deliveredFiles(assets)+'</div>':'';
   return '<article class="dock-reply"><div class="dock-byline"><button class="dock-author" type="button" data-id="'+esc(k)+uiText('" title="查看交付节点"><canvas aria-hidden="true"></canvas>')+esc(displayRole(run,k).name)+'</button>'+
     '<button class="dock-copy" type="button" data-copy="'+esc(k)+uiText('" aria-label="复制正文" title="复制正文">')+copyMark+'</button></div>'+
-    '<h3>'+esc(file.title)+'</h3>'+(simpleFileNote?attachments+note:note+images+attachments)+(project?projectCard():'')+
+    '<h3>'+esc(file.title)+'</h3>'+(simpleFileNote?attachments+note:note+images+attachments)+(project?'<div class="dock-project-deliveries"></div>'+projectCard():'')+
     (file.gaps?uiText('<p class="route-note gap-note">交付缺口 · ')+esc(file.gaps)+'</p>':'')+'</article>';
 }
 
@@ -175,7 +232,8 @@ function renderAnswerDock(s,done){
     button.type='button';button.dataset.asset=item.id;img.alt=item.name;button.append(img);pictures.append(button);
     pictureURL(item).then(url=>{if(url)img.src=url}).catch(()=>{});
   }
-  materializeFiles(content);if(host)fillProjects(content);
+  materializeFiles(content);
+  if(host)for(const container of content.querySelectorAll('.dock-project-deliveries'))fillProjectDeliveries(container);
   content.scrollTop=scroll;
 }
 
@@ -199,13 +257,15 @@ function installAnswerResize(){
     const style=getComputedStyle(panel);
     return [Math.ceil(parseFloat(style.minWidth)),Math.floor(parseFloat(style.maxWidth))];
   };
-  new ResizeObserver(()=>{
+  const resizeObserver=new ResizeObserver(()=>{
     if(panel.hidden)return;
     const [min,max]=limits();
     handle.setAttribute('aria-valuemin',String(min));
     handle.setAttribute('aria-valuemax',String(max));
     handle.setAttribute('aria-valuenow',String(panel.offsetWidth));
-  }).observe(panel);
+  });
+  resizeObserver.observe(panel);
+  resizeObserver.observe(panel.parentElement);
   let drag;
   handle.addEventListener('pointerdown',e=>{
     if(e.button!==0||drag)return;
@@ -221,6 +281,7 @@ function installAnswerResize(){
   handle.addEventListener('lostpointercapture',()=>{
     drag=undefined;
     handle.classList.remove('dragging');
+    if(panel.hidden)return;
     apply(panel.offsetWidth);
     persist();
   });

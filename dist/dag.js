@@ -123,6 +123,18 @@ const Dag = (() => {
     const paths=cleanPaths(n.paths);if(paths.length)r.paths=paths;
     return r;
   }
+  function verification(role){
+    return !!(role?.review||role?.stage==='verify'||(!role?.stage&&/验收|复核|审查|验证|\b(?:review|verification|verify|acceptance)\b/i.test(role?.name||'')));
+  }
+  function observerReturn(flow,source,delivery,proposal,terminal=false){
+    const id=proposal?.id, evidence=String(proposal?.evidence||'').trim(), reason=String(proposal?.reason||'').trim();
+    const gaps=String(delivery?.gaps||'').trim();
+    if(!validId(id)||!Object.hasOwn(flow.files,id)||flow.files[id].skipped||!evidence||!reason||!gaps.includes(evidence))return null;
+    if(terminal?!descendants(flow.deps,id).includes(source):id!==source)return null;
+    const gap=gaps.replace(/\s/g,'').slice(0,1600),quote=evidence.replace(/\s/g,'').slice(0,600);
+    if((flow.observerReturns||[]).some(r=>r.id===id&&(r.gap===gap||r.quote===quote)))return null;
+    return {id,gap,quote,evidence:evidence.slice(0,600),reason:reason.slice(0,1200)};
+  }
   function definition(nodes,workspace){
     if(!Array.isArray(nodes)||nodes.some(n=>!validId(n?.id)||typeof n.name!=='string'||!n.name.trim()||typeof n.artifact!=='string'||!n.artifact.trim())||new Set(nodes.map(n=>n.id)).size!==nodes.length)throw Error(uiText('节点需要唯一标识、角色名和交付物'));
     const roles={},deps={},overrides={};
@@ -329,6 +341,10 @@ const Dag = (() => {
         // Targets that already delivered or ran too long to restart drop out; the node still joins if any target remains (or none was asked).
         const targets=before.filter(t=>['now','restart'].includes(access(t)));
         if(before.length&&!targets.length){reject(op,'targets');continue}
+        if(op.stage==='verify'&&after.length){
+          const coverage=after.map(id=>new Set(descendants(next,id)));
+          if(Object.keys(next).some(k=>!done(k)&&verification(pack[k])&&coverage.every(set=>set.has(k)))){reject(op,'existing-verification');continue}
+        }
         let id=String(op.id||'').toLowerCase().replace(/[^a-z0-9_]/g,'_').replace(/^[^a-z]+/,'').slice(0,36)||'live';
         if(!validId(id))id='n_'+id;
         let unique=id;for(let i=2;Object.hasOwn(next,unique);i++)unique=id+'_'+i;
@@ -361,6 +377,6 @@ const Dag = (() => {
     }
     return {deps:out,pack};
   }
-  return {crossReview,toFile,fromFile,planned,levels,descendants,tidy,nameFrom,definition,expand,briefPolicy,assignBriefRuntimes,usedContinuation,checkedContinuation,limits,cleanWorkspace,cleanPaths,delivery,needs,cleanNeeds,needList,outputs,complete,stripBriefs,patch,apply,revision};
+  return {crossReview,toFile,fromFile,planned,levels,descendants,tidy,nameFrom,definition,expand,briefPolicy,assignBriefRuntimes,usedContinuation,checkedContinuation,verification,observerReturn,limits,cleanWorkspace,cleanPaths,delivery,needs,cleanNeeds,needList,outputs,complete,stripBriefs,patch,apply,revision};
 })();
 if(typeof module!=='undefined')module.exports=Dag;

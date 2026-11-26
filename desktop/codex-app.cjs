@@ -118,20 +118,32 @@ class CodexApp{
     const t=this.turns.get(threadId);if(!t?.turnId)throw Error(uiText('当前没有可追加要求的执行'));
     await this.request('turn/steer',{threadId,expectedTurnId:t.turnId,input:[{type:'text',text}]});
   }
-  // Runs one turn. Reuses `threadId` when it is still loaded in this process, so a follow-up keeps its context.
-  async run({cwd,extraDirectory,prompt,images=[],model,planning,network,captureSources=false,approvalMode='auto',threadId,signal,timeout,step=()=>{},delta=()=>{},usage=()=>{},approve,onThread}){
+  async run({cwd,extraDirectory,prompt,images=[],model,planning,network,captureSources=false,approvalMode='auto',threadId,persistThread=false,signal,timeout,step=()=>{},delta=()=>{},usage=()=>{},approve,onThread}){
     await this.start();
     if(signal?.aborted)throw Error(uiText('本次运行已停止'));
     const policy=planning?'never':approvalMode==='ask'?'untrusted':approvalMode==='allow'?'never':'on-request';
     const sandbox=sandboxMode(planning,approvalMode);
-    let id=threadId&&this.threads.get(threadId)===sandbox?threadId:null,resumed=!!id;
+    const config={...(sandbox==='workspace-write'&&extraDirectory?{'sandbox_workspace_write.writable_roots':[extraDirectory]}:{}),...(sandbox==='workspace-write'&&network?{'sandbox_workspace_write.network_access':true}:{}),...(planning?{model_reasoning_effort:'medium'}:{})};
+    const settings={cwd,...(model?{model}:{}),approvalPolicy:policy,sandbox,config};
+    const loaded=threadId&&this.threads.has(threadId);
+    let id=loaded&&this.threads.get(threadId)===sandbox?threadId:null;
+    if(!id&&threadId&&!loaded&&persistThread&&!planning){
+      try{
+        const r=await this.request('thread/resume',{...settings,threadId,excludeTurns:true});
+        if(r.thread.id!==threadId)throw Error(uiText('Codex 返回了不同的会话'));
+        id=threadId;this.threads.set(id,sandbox);
+      }catch(err){
+        if(!/no rollout|thread (?:not found|does not exist)|unknown thread|cannot resume.*ephemeral|ephemeral.*cannot be resumed/i.test(err.message))throw err;
+      }
+    }
+    const resumed=!!id;
     if(!id){
-      const config={...(sandbox==='workspace-write'&&extraDirectory?{'sandbox_workspace_write.writable_roots':[extraDirectory]}:{}),...(sandbox==='workspace-write'&&network?{'sandbox_workspace_write.network_access':true}:{}),...(planning?{model_reasoning_effort:'medium'}:{})};
-      const r=await this.request('thread/start',{cwd,...(model?{model}:{}),approvalPolicy:policy,sandbox,ephemeral:true,config});
+      if(signal?.aborted)throw Error(uiText('本次运行已停止'));
+      const r=await this.request('thread/start',{...settings,ephemeral:planning||!persistThread});
       id=r.thread.id;this.threads.set(id,sandbox);
     }
     if(signal?.aborted)throw Error(uiText('本次运行已停止'));
-    onThread?.(id);
+    onThread?.(id,resumed);
     return new Promise((resolve,reject)=>{
       let finalText='',draft='',settled=false,paused=false,remaining=timeout,since=Date.now(),timer;
       const arm=()=>{if(!timeout||settled||signal?.aborted)return;since=Date.now();timer=setTimeout(()=>{if(turn.turnId)this.request('turn/interrupt',{threadId:id,turnId:turn.turnId}).catch(()=>{});finish(Error(uiText('超过 ')+Math.round(timeout/60000)+uiText(' 分钟仍未完成，已停止')))},remaining)};
@@ -180,7 +192,9 @@ class CodexApp{
       signal?.addEventListener('abort',stop,{once:true});
       if(signal?.aborted)stop();
       const input=[{type:'text',text:prompt},...images.map(f=>({type:'localImage',path:f.path}))];
-      this.request('turn/start',{threadId:id,cwd,input,...(model?{model}:{}),approvalPolicy:policy})
+      // Each attempt has a fresh output directory even when it reuses the conversation.
+      const sandboxPolicy=resumed&&sandbox==='workspace-write'?{type:'workspaceWrite',writableRoots:extraDirectory?[extraDirectory]:[],networkAccess:!!network}:undefined;
+      this.request('turn/start',{threadId:id,cwd,input,...(model?{model}:{}),approvalPolicy:policy,...(sandboxPolicy?{sandboxPolicy}:{})})
         .then(r=>{turn.turnId=r.turn?.id||turn.turnId;if(signal?.aborted)stop()},err=>finish(err));
     });
   }

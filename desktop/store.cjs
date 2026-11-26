@@ -8,6 +8,7 @@ class Store{
     this.db.exec(`pragma journal_mode=wal;pragma synchronous=normal;
       create table if not exists meta(key text primary key,json text not null);
       create table if not exists sessions(id text primary key,json text not null,updated integer not null);
+      create table if not exists node_threads(session text not null,node text not null,thread text not null,context text not null,primary key(session,node));
       create table if not exists events(seq integer primary key autoincrement,at integer not null,session text,node text,kind text not null,json text not null);
       create index if not exists events_session on events(session,seq);`);
     if(this.db.prepare('pragma quick_check').get().quick_check!=='ok')throw Error('数据库校验未通过');
@@ -34,14 +35,20 @@ class Store{
     const ids=[...order.filter(id=>rows.has(id)),...[...rows.keys()].filter(id=>!order.includes(id))];
     return {...meta,sessions:ids.map(id=>JSON.parse(rows.get(id)))};
   }
+  nodeThread(session,node,context){
+    return this.db.prepare('select thread from node_threads where session=? and node=? and context=?').get(session,node,context)?.thread;
+  }
+  putNodeThread(session,node,thread,context){
+    this.db.prepare('insert into node_threads values(?,?,?,?) on conflict(session,node) do update set thread=excluded.thread,context=excluded.context').run(session,node,thread,context);
+  }
   // patch: {meta?: JSON string of workspace fields, upsert?: [{id, json}], remove?: [id]} — applied atomically.
   apply(patch){
     const now=Date.now(),put=this.db.prepare('insert into sessions(id,json,updated) values(?,?,?) on conflict(id) do update set json=excluded.json,updated=excluded.updated');
-    const drop=this.db.prepare('delete from sessions where id=?'),meta=this.db.prepare('insert into meta(key,json) values(?,?) on conflict(key) do update set json=excluded.json');
+    const drop=this.db.prepare('delete from sessions where id=?'),dropThreads=this.db.prepare('delete from node_threads where session=?'),meta=this.db.prepare('insert into meta(key,json) values(?,?) on conflict(key) do update set json=excluded.json');
     this.db.exec('begin');
     try{
       for(const s of patch.upsert||[]){if(typeof s?.id!=='string'||typeof s.json!=='string')throw Error('无效的工作流记录');JSON.parse(s.json);put.run(s.id,s.json,now)}
-      for(const id of patch.remove||[])if(typeof id==='string')drop.run(id);
+      for(const id of patch.remove||[])if(typeof id==='string'){drop.run(id);dropThreads.run(id)}
       if(typeof patch.meta==='string')for(const [k,v] of Object.entries(JSON.parse(patch.meta)))meta.run(k,JSON.stringify(v));
       this.db.exec('commit');
     }catch(err){this.db.exec('rollback');throw err}

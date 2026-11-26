@@ -209,6 +209,60 @@ test('terminal continuation waits for verification and keeps prior deliveries', 
   assert.equal(observeOnly.flow.files.verify.observation.summary,'Advice only');
 });
 
+test('observer returns owned repairs to the original node and retains the integration check',async()=>{
+  const definition=Dag.definition([
+    {id:'cave',name:'洞穴开发',artifact:'净宽',description:'原路线至少 1.2 米',paths:['game/cave.gd'],deps:[]},
+    {id:'coast',name:'海岸开发',artifact:'布景',deps:[]},
+    {id:'verify',name:'集成验收',artifact:'报告',stage:'verify',deps:['cave','coast']}
+  ]);
+  const makeFlow=()=>({...structuredClone(definition),pack:structuredClone(definition.roles),query:'完成海岸并通过验收',
+    files:{cave:{title:'净宽',body:'窗口走查完成',gaps:'实测仅 1.046 米'},coast:{title:'布景',body:'keep'}},
+    dispatch:{},events:{},logs:[],time:0,versions:[{deps:structuredClone(definition.deps)}]});
+  const host={events(){}};
+  const timers=new Map([['s',Symbol('running')]]);
+  const ctx={window:{relayHost:host},document:{addEventListener(){}},Dag,Delivery,timers,db:{settings:{}},hostLeases:new Map(),
+    uiText:s=>s,save(){},render(){},settleApprovals(){},route:()=>({harness:'Codex',model:'test'})};
+  const scripts=['workflow','host-client'].map(f=>fs.readFileSync(require.resolve('../../dist/'+f+'.js'),'utf8'));
+  const api=vm.runInNewContext(scripts.join('\n')+'\npump=()=>{};({observe,follow,stub(fn){requestPlanner=fn}})',ctx);
+  const s={id:'s',flow:makeFlow()};
+  const verdict=Promise.withResolvers();
+  api.stub((_q,{state})=>{
+    assert.equal(state.remaining[0].id,'verify');
+    assert.equal(state.remaining[0].verification,true);
+    assert.equal(state.remaining[0].downstream,true);
+    return verdict.promise;
+  });
+  assert.equal(api.observe(s,'cave'),true);
+  assert.equal(s.flow.holding.verify,1);
+  const repair={op:'return',id:'cave',evidence:'实测仅 1.046 米',reason:'达到 1.2 米，保留交互碰撞'};
+  verdict.resolve({ops:[repair]});
+  await new Promise(setImmediate);
+  assert.equal(s.flow.holding.verify,undefined);
+  assert.deepEqual(Object.keys(s.flow.files),['coast']);
+  assert.match(s.flow.feedback.cave.note,/保留交互碰撞/);
+  assert.deepEqual(Object.keys(s.flow.deps),['cave','coast','verify']);
+  assert.equal(Dag.observerReturn(s.flow,'cave',{gaps:repair.evidence},repair),null);
+  s.flow.files.cave={title:'净宽',body:'新版',gaps:repair.evidence};
+  assert.equal(Dag.observerReturn(s.flow,'cave',s.flow.files.cave,repair),null);
+  const duplicate=Dag.apply(s.flow,[{op:'add',id:'extra',name:'再做集成验收',description:'检查新版洞穴',artifact:'报告',stage:'verify',after:['cave']}]);
+  assert.equal(duplicate.rejected[0].why,'existing-verification');
+  assert.deepEqual(Object.keys(s.flow.deps),['cave','coast','verify']);
+
+  const final={id:'final',flow:makeFlow()};
+  final.flow.dispatch.verify={harness:'Codex'};
+  api.stub(async(_q,{state})=>{
+    assert.equal(state.terminal,true);
+    assert.equal(state.done.find(n=>n.id==='cave').paths[0],'game/cave.gd');
+    return {summary:'净宽已达标但碰撞变了',rework:{id:'cave',evidence:'石台碰撞发生移动',reason:'保留原石台碰撞'}};
+  });
+  api.follow(final,'verify',Promise.resolve({delivery:'project',body:'验收说明',gaps:'石台碰撞发生移动'}));
+  await new Promise(setImmediate);
+  assert.deepEqual(Object.keys(final.flow.files),['coast']);
+  assert.match(final.flow.feedback.cave.note,/保留原石台碰撞/);
+  assert.deepEqual(Object.keys(final.flow.deps),['cave','coast','verify']);
+  assert.equal(final.flow.dispatch.verify,undefined);
+});
+
 test('continuation rejects unauditable, duplicate or oversized proposals',()=>{
   const delivery={body:'The replay still fails at checkpoint 4.'};
   const node={id:'repair',name:'Replay',artifact:'Receipt',description:'Correct the replay',

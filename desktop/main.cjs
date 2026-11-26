@@ -2,7 +2,7 @@ const Delivery=require('../dist/delivery.js'),textChecks=require('./text-checks.
 const i18n=require('../dist/i18n.js'),uiText=i18n.text;
 const {app,BrowserWindow,ipcMain,protocol,dialog,shell,Menu,nativeTheme,systemPreferences}=require('electron');
 const path=require('node:path'),{pathToFileURL}=require('node:url');
-const fs=require('node:fs'),{Files,read,atomic}=require('./files.cjs'),runtime=require('./runtimes.cjs'),prompts=require('./prompts.cjs'),{Store}=require('./store.cjs'),{randomUUID}=require('node:crypto'),project=require('./project.cjs');
+const fs=require('node:fs'),{Files,read,atomic,previewText,imageNames}=require('./files.cjs'),runtime=require('./runtimes.cjs'),prompts=require('./prompts.cjs'),{Store}=require('./store.cjs'),{randomUUID}=require('node:crypto'),project=require('./project.cjs');
 const entry=path.join(__dirname,'../dist/index.html'),entryURL=pathToFileURL(entry).href;
 protocol.registerSchemesAsPrivileged([{scheme:'relay-asset',privileges:{standard:true,secure:true,stream:true,supportFetchAPI:true}}]);
 const profile=process.env.BERCY_PROFILE||process.env.RELAY_PROFILE;
@@ -91,19 +91,51 @@ handle('project-info',async sessionId=>{
 });
 // Links inside a project delivery: pages and documents open in their default app, anything else is shown in Finder.
 // Paths are resolved inside the project directory only.
-function resolveProjectFile(sessionId,rel){
-  const directory=findProject(sessionId);if(!directory)throw Error(uiText('找不到项目目录'));
-  const root=fs.realpathSync(directory);let clean=String(rel||'').trim().replace(/^<|>$/g,'').replace(/^file:\/\//,'').split(/[?#]/)[0];
+function resolveProjectFile(root,rel){
+  let clean=String(rel||'').trim().replace(/^<|>$/g,'').replace(/^file:\/\//,'').split(/[?#]/)[0];
   try{clean=decodeURIComponent(clean)}catch{}
   const target=path.isAbsolute(clean)?clean:path.join(root,clean);
   let real;try{real=fs.realpathSync(target)}catch{throw Error(uiText('项目里没有这个文件：')+clean)}
   if(real!==root&&!real.startsWith(root+path.sep))throw Error(uiText('只能打开项目目录里的文件'));
   return real;
 }
+function projectFileRoot(sessionId){
+  const directory=findProject(sessionId);
+  if(!directory)throw Error(uiText('找不到项目目录'));
+  return fs.realpathSync(directory);
+}
 handle('project-file',async(sessionId,rel)=>{
-  const real=resolveProjectFile(sessionId,rel);
+  const real=resolveProjectFile(projectFileRoot(sessionId),rel);
   if(fs.statSync(real).isFile()&&(Delivery.canOpen(real)||['.html','.htm','.svg'].includes(path.extname(real).toLowerCase()))){const err=await shell.openPath(real);if(err)throw Error(err);return 'opened'}
   shell.showItemInFolder(real);return 'revealed';
+});
+const pathForPreview=value=>value.split(path.sep).map(encodeURIComponent).join('/');
+handle('project-preview',async(sessionId,rel)=>{
+  const root=projectFileRoot(sessionId),file=resolveProjectFile(root,rel);
+  const ext=path.extname(file).toLowerCase();
+  if(!['.md','.markdown','.json'].includes(ext)||!fs.statSync(file).isFile())return null;
+  const directory=path.dirname(file),base=pathForPreview(path.relative(root,directory)),text=await previewText(file);
+  if(ext!=='.json')return {type:'markdown',base,text};
+  let value;try{value=JSON.parse(text)}catch{return {type:'json',text,tests:[]}}
+  const tests=[],pending=[['',value]];
+  while(pending.length&&tests.length<40){
+    const [name,item]=pending.pop();
+    if(!item||typeof item!=='object')continue;
+    if(typeof item.exit!=='number'&&typeof item.pass!=='string'){
+      for(const entry of Object.entries(item).reverse())pending.push(entry);
+      continue;
+    }
+    let images=[];
+    if(typeof item.folder==='string'&&item.folder.trim()){
+      const folder=path.resolve(directory,item.folder);
+      try{
+        const real=resolveProjectFile(root,pathForPreview(folder));
+        images=(await imageNames(real)).map(name=>pathForPreview(path.relative(root,path.join(real,name))));
+      }catch{}
+    }
+    tests.push({name,exit:typeof item.exit==='number'?item.exit:null,output:typeof item.pass==='string'?item.pass:'',images});
+  }
+  return {type:'json',text,tests};
 });
 handle('project-open',async sessionId=>{const root=findProject(sessionId);if(root){const err=await shell.openPath(root);if(err)throw Error(err)}});
 handle('planning-guide',async text=>{
@@ -256,27 +288,33 @@ async function execute(req){
       if(runner.supportsImages){images=pictures;for(const f of pictures)f.visual=true}
       if(pictures.length)send({key:req.key,message:(images.length?uiText('图像直传 · '):uiText('图片文件输入 · '))+pictures.map(f=>f.name).join('、')});
       prompt=prompts.worker({...req,inputs,outDir:path.join(cwd,'out'),workspace:req.workspace,projectRoot:job.project,localDirectory:selected});
-      // A follow-up on a Codex thread that is still loaded only needs the new instruction.
-      if(!selected&&req.threadId&&req.node.feedback&&runtime.hasThread(runner.bin,req.threadId,runApprovalMode,scope))req.followUp=sentInputs.length||req.reviewed||inputs.some(g=>g.spilled)?prompt:prompts.followUp(req.node,inputs,path.join(cwd,'out'));
     }else throw Error(uiText('不支持的执行类型'));
     const node=req.kind==='node';dbg('prompt ready');
-    if(node)send({key:req.key,prompt:req.followUp?uiText('（在同一对话中继续）\n\n')+req.followUp:prompt,sentInputs});
+    if(node)send({key:req.key,prompt,sentInputs});
     const minutes=Number(req.timeout)>0?Math.min(180,Math.max(1,Number(req.timeout))):(node?0:12);
     const needs=Array.isArray(req.needs)?req.needs.filter(n=>typeof n==='string'):[];
+    const [,nodeId]=ids(req.key);
+    const persistThread=!!(node&&scope&&nodeId&&runner.protocol==='codex-app');
+    const threadContext=JSON.stringify([runner.bin,selected||job.project||null,runApprovalMode]);
+    const resumeThread=persistThread?store.nodeThread(scope,nodeId,threadContext):undefined;
     // Live progress goes to the window; finished steps also go to the event log.
     let lastDelta=0;
     const report=x=>{
       if(!node)return;
-      if(x.thread){job.thread=x.thread;send({key:req.key,thread:x.thread});return}
+      if(x.thread){
+        job.thread=x.thread;
+        if(persistThread)store.putNodeThread(scope,nodeId,x.thread,threadContext);
+        send({key:req.key,thread:x.thread,...(x.thread===resumeThread&&x.resumed?{prompt:uiText('（在同一对话中继续）\n\n')+prompt,sentInputs}:{})});
+        return;
+      }
       if(x.delta!=null){const now=Date.now();if(now-lastDelta<120)return;lastDelta=now;send({key:req.key,delta:x.delta.slice(-20000)});return}
       if(x.step){send({key:req.key,step:x.step});if(x.step.status!=='running')store.log(...ids(req.key),'step',x.step)}
     };
     const opts={name:runner.name,bin:runner.bin,scope,protocol:runner.protocol,args:runner.args,model:req.model,cwd:selected||job.project||cwd,attemptDir:cwd,extraDirectory:selected&&req.kind==='node'?cwd:undefined,images,signal:controller.signal,report,
-      usage:value=>{if(node)send({key:req.key,usage:value})},planning:!node,captureSources:node&&req.node.needs?.includes('network'),needs,timeout:minutes*60*1000,approvalMode:runApprovalMode,
+      usage:value=>{if(node)send({key:req.key,usage:value})},planning:!node,persistThread,captureSources:node&&req.node.needs?.includes('network'),needs,timeout:minutes*60*1000,approvalMode:runApprovalMode,
       approve:request=>ask(req.key,runner,req.node?.name||'',request)};
-    let out;dbg('invoke');
-    try{out=await runtime.invoke({...opts,prompt:req.followUp||prompt,threadId:req.followUp?req.threadId:undefined})}
-    catch(err){if(!req.followUp||controller.signal.aborted)throw err;send({key:req.key,prompt,sentInputs});out=await runtime.invoke({...opts,prompt})}
+    dbg('invoke');
+    const out=await runtime.invoke({...opts,prompt,threadId:resumeThread});
     let raw=typeof out==='string'?out:out.text,thread=typeof out==='object'?out.threadId:null;
     if(node && prompts.Dag.delivery(req.node)==='text'){
       raw=textChecks.copyBody(raw,req.node);
@@ -347,8 +385,10 @@ async function execute(req){
     if(req.kind==='revise')return result.change||null;
     if(req.kind==='expand')return result.expand||null;
     if(req.kind==='observe'&&req.state?.terminal){
-      const continuation=result.continuation;
-      return {summary:String(result.summary||'').slice(0,500),
+      const continuation=result.continuation,rework=result.rework;
+      return {summary:String(result.summary||'').slice(0,500),...(rework?.id&&rework?.evidence&&rework?.reason?{rework:{
+        id:String(rework.id).slice(0,80),evidence:String(rework.evidence).slice(0,600),reason:String(rework.reason).slice(0,1200)
+      }}:{}),
         continuation:Array.isArray(continuation?.nodes)&&continuation.nodes.length?
           {reason:String(continuation.reason||'').slice(0,300),progressEvidence:String(continuation.progressEvidence||'').slice(0,600),nodes:continuation.nodes.slice(0,prompts.Dag.limits.continuationNodes+1)}:null};
     }
@@ -404,7 +444,7 @@ app.whenReady().then(()=>{
     const url=new URL(req.url),id=url.pathname.slice(1);
     if(url.hostname==='file')return files.response(id,req.headers.get('range'));
     if(url.hostname==='project'&&/^[a-f0-9-]{36}$/i.test(id)&&url.searchParams.has('path')){
-      try{return files.projectImage(resolveProjectFile(id,url.searchParams.get('path')))}
+      try{return files.projectImage(resolveProjectFile(projectFileRoot(id),url.searchParams.get('path')))}
       catch{return new Response(null,{status:404})}
     }
     return new Response(null,{status:404});

@@ -1,12 +1,14 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
-const {invoke,disposeAll,steer,hasThread,explain}=require('../runtimes.cjs'),{Store}=require('../store.cjs');
+const {invoke,disposeAll,steer,hasThread,explain,stopWorkflow}=require('../runtimes.cjs'),{Store}=require('../store.cjs');
 test.after(disposeAll);
 async function temp(t){const dir=await fs.mkdtemp(path.join(os.tmpdir(),'relay-p3-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));return dir}
 // A stand-in for `codex app-server`: one thread per thread/start, a command that needs approval, streamed text, steer support.
 const fakeCodex=`#!/usr/bin/env node
 const rl=require('node:readline').createInterface({input:process.stdin});let n=0,pending=null,turn=0;
+const fs=require('node:fs'),trace=__dirname+'/requests.jsonl';
 const send=m=>process.stdout.write(JSON.stringify(m)+'\\n');
 rl.on('line',line=>{const m=JSON.parse(line);
+  if(['thread/start','thread/resume','turn/start'].includes(m.method))fs.appendFileSync(trace,line+'\\n');
   if(m.id!=null&&!m.method&&pending){const d=m.result.decision;const p=pending;pending=null;
     send({method:'item/completed',params:{threadId:p.t,item:{id:'cmd',type:'commandExecution',command:"/bin/zsh -lc 'echo hi'",exitCode:d==='decline'?1:0,aggregatedOutput:d}}});
     send({method:'item/agentMessage/delta',params:{threadId:p.t,delta:'答'}});
@@ -16,7 +18,13 @@ rl.on('line',line=>{const m=JSON.parse(line);
   if(m.method==='initialize')return send({id:m.id,result:{userAgent:'codex/0.166.0'}});
   if(m.method==='thread/start'){
     if(m.params.sandbox==='danger-full-access'&&m.params.approvalPolicy!=='never')return send({id:m.id,error:{message:'Unexpected approval mode'}});
-    return send({id:m.id,result:{thread:{id:(m.params.sandbox==='danger-full-access'?'full':'th')+(++n)}}});
+    const id=m.params.ephemeral===false?'saved-'+process.pid+'-'+(++n):(m.params.sandbox==='danger-full-access'?'full':'th')+(++n);
+    if(m.params.ephemeral===false)fs.writeFileSync(__dirname+'/'+id,'');
+    return send({id:m.id,result:{thread:{id}}});
+  }
+  if(m.method==='thread/resume'){
+    const id=m.params.threadId;
+    return fs.existsSync(__dirname+'/'+id)?send({id:m.id,result:{thread:{id}}}):send({id:m.id,error:{message:'no rollout found for thread'}});
   }
   if(m.method==='turn/steer')return send({id:m.id,result:{turnId:m.params.expectedTurnId}});
   if(m.method==='turn/start'){turn++;const t=m.params.threadId,text=m.params.input[0].text;send({id:m.id,result:{turn:{id:'turn'+turn}}});
@@ -45,6 +53,28 @@ test('Codex app-server：步骤成对、流式正文、审批往返、同一线�
   assert.equal(restored.threadId,'th4');
   assert.equal(restored.resumed,false);
   await assert.rejects(steer(bin,'th9','x'),/没有可追加/);
+});
+test('Codex project repair resumes its persisted thread after app-server exits',async t=>{
+  const dir=await temp(t),bin=path.join(dir,'codex'),scope='project-repair';
+  await fs.writeFile(bin,fakeCodex,{mode:0o700});
+  const run=(text,extra={})=>invoke({name:'Codex',bin,scope,cwd:dir,prompt:text,persistThread:true,
+    approve:async()=>'allow',timeout:10000,...extra});
+  const first=await run('initial',{extraDirectory:path.join(dir,'first')});
+  await stopWorkflow(scope);
+  const output=path.join(dir,'second');
+  const repair=await run('repair',{threadId:first.threadId,extraDirectory:output});
+  assert.equal(repair.threadId,first.threadId);
+  assert.equal(repair.resumed,true);
+  const missing=await run('recover with complete brief',{threadId:'missing'});
+  assert.equal(missing.resumed,false);
+  assert.notEqual(missing.threadId,first.threadId);
+  const requests=(await fs.readFile(path.join(dir,'requests.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+  const resume=requests.find(r=>r.method==='thread/resume');
+  assert.equal(resume.params.cwd,dir);
+  assert.equal(resume.params.threadId,first.threadId);
+  const turn=requests.find(r=>r.method==='turn/start'&&r.params.input[0].text==='repair');
+  assert.deepEqual(turn.params.sandboxPolicy.writableRoots,[output]);
+  assert.equal(turn.params.sandboxPolicy.networkAccess,false);
 });
 test('ACP 审批：自动模式在目录外询问，「本节点都允许」之后不再询问，全部允许不弹出',async t=>{
   const dir=await temp(t),bin=path.join(dir,'acp');
@@ -79,6 +109,14 @@ test('SQLite 存储：按工作流增量写入、保持顺序、导入旧工作�
   assert.deepEqual(store.load().sessions.map(s=>s.id),['a']);
   assert.throws(()=>store.apply({upsert:[{id:'x',json:'{bad'}]}));assert.deepEqual(store.load().sessions.map(s=>s.id),['a']);
   store.log('a','n1','step',{label:'运行命令'});assert.equal(store.events('a')[0].json.label,'运行命令');
+  store.putNodeThread('a','n1','thread-a','workspace-a');
+  assert.equal(store.nodeThread('a','n2','workspace-a'),undefined);
+  assert.equal(store.nodeThread('a','n1','workspace-b'),undefined);
+  store.close();
+  ({store}=Store.open(file));
+  assert.equal(store.nodeThread('a','n1','workspace-a'),'thread-a');
+  store.apply({remove:['a']});
+  assert.equal(store.nodeThread('a','n1','workspace-a'),undefined);
   store.close();await fs.writeFile(file,'not a database');for(const x of ['-wal','-shm'])await fs.rm(file+x,{force:true});
   const reopened=Store.open(file);assert.ok(reopened.problem.backup);assert.equal(reopened.store.load(),null);reopened.store.close();
 });

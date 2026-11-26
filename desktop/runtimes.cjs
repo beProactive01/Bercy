@@ -286,7 +286,7 @@ async function invoke(opts){
       clearTimeout(app.idleTimer);app.activeRuns=(app.activeRuns||0)+1;
       try{
         try{await app.start()}catch(err){if(!/app-server|unrecognized|unknown/i.test(err.message))throw err;return await codexExec({bin,cwd,extraDirectory,prompt,images,model,planning,approvalMode,network,captureSources:opts.captureSources,signal,timeout,report,usage})}
-        const r=await app.run({cwd,extraDirectory,prompt,images,model,planning,network,captureSources:opts.captureSources,approvalMode,threadId,signal,timeout,step:s=>report({step:s}),delta:d=>report({delta:d}),usage,approve,onThread:id=>report({thread:id})});
+        const r=await app.run({cwd,extraDirectory,prompt,images,model,planning,network,captureSources:opts.captureSources,approvalMode,threadId,persistThread:opts.persistThread,signal,timeout,step:s=>report({step:s}),delta:d=>report({delta:d}),usage,approve,onThread:(id,resumed)=>report({thread:id,resumed})});
         return planning?r.text:{text:r.text,threadId:r.threadId,resumed:r.resumed};
       }finally{
         app.activeRuns--;

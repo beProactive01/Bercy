@@ -136,6 +136,9 @@ async function continueFromDelivery(s,id,instruction="",form){
   const options={manual:true,instruction,form};
   const observation=await observeFinal(s,id,nodeSpec(f,id),file,options);
   if(s.stopped||f.files[id]!==file||form&&(!form.isConnected||!$('modal').open))return false;
+  if(observation?.rework&&applyObserverReturn(s,id,file,observation.rework,true)){
+    s.answerOpen=false;start(s);return true;
+  }
   if(!observation?.continuation||!appendContinuation(f,id,file,observation.continuation,options))return false;
   s.answerOpen=false;start(s);return true;
 }
@@ -220,26 +223,46 @@ function applyLive(s,ops,{reason='',source='',base=null,since=null}={}){
 // Observer: when a node delivers, one planner call reads the delivery and decides whether nodes that have not
 // delivered should be skipped, rewritten, or joined by a new node (this also covers `when` conditions and reported
 // gaps). It runs alongside the downstream nodes, which start at once; a change that affects one of them restarts it.
-// Only direct children with a `when` condition wait for the verdict, since starting them may be wasted work.
+// Conditional children and children of an incomplete delivery wait for the verdict.
 // A separate final observation reads the acceptance result before the workflow settles.
 const observeTimeout=3;
 const liveOn=()=>!!host&&db.settings?.live!=='off';
+function returnToNode(s,id,note,current){
+  const f=s.flow;
+  return invalidate(f,id,note,k=>k!==current&&inflight.has(s.id+'/'+k),k=>{
+    (f.restarting??={})[k]=true;
+    recordNode(f,k,uiText('上游已退回，等待新版输入后重做'));
+    host.cancel(s.id+'/'+k).catch(()=>{});
+  });
+}
+function applyObserverReturn(s,source,file,proposal,terminal=false,current){
+  const f=s.flow,repair=Dag.observerReturn(f,source,file,proposal,terminal);
+  if(!repair||s.stopped)return false;
+  const {id,reason,evidence}=repair,note=reason+'\n'+evidence;
+  returnToNode(s,id,note,current);
+  (f.observerReturns??=[]).push(repair);
+  recordNode(f,id,uiText('观察者退回原节点')+' · '+reason);
+  f.logs.unshift([f.time,uiText('观察者退回原节点')+' · '+f.pack[id].name,reason]);
+  save(s);return true;
+}
 async function observeFinal(s,id,spec,delivery,{manual=false,instruction='',allowContinuation=true,form}={}){
   const f=s.flow;
   (f.expanding??={})[id]=true;
   recordNode(f,id,uiText('观察者检查最终交付'));save(s);render();
   try{
     const done=Object.entries(f.files).filter(([key,file])=>key!==id&&!file.skipped).map(([key,file])=>({
-      name:f.pack[key].name,summary:String(file.summary||'').slice(0,400),gaps:file.gaps||''
+      id:key,name:f.pack[key].name,task:nodeSpec(f,key).description,deps:f.deps[key],paths:f.pack[key].paths||[],
+      verification:Dag.verification(f.pack[key]),summary:String(file.summary||'').slice(0,400),gaps:file.gaps||''
     }));
     const body=String(delivery.body||'');
     const history=f.continuationHistory||[];
-    const state={terminal:true,manual,instruction:instruction||f.continuationInstruction||'',allowContinuation,history,maxNextNodes:Dag.limits.continuationNodes,done,delivered:{name:spec.name,task:spec.description,
+    const state={terminal:true,manual,instruction:instruction||f.continuationInstruction||'',allowContinuation,history,previousReturns:f.observerReturns||[],maxNextNodes:Dag.limits.continuationNodes,done,delivered:{id,name:spec.name,deps:f.deps[id],verification:Dag.verification(spec),task:spec.description,
       body:body.length>30000?body.slice(0,24000)+'\n…\n'+body.slice(-6000):body,
       ...(body.length>30000?{bodyLength:body.length}:{}),gaps:delivery.gaps||'',verificationPending:!!delivery.verificationPending}};
     const observation=await requestPlanner(f.query,{state,timeout:observeTimeout},'observe',form,s);
     if(s.stopped||f.restarting?.[id])return null;
     if(observation?.summary)recordNode(f,id,uiText('观察者 · ')+observation.summary);
+    if(observation?.rework)return {...observation,rework:allowContinuation?observation.rework:null,continuation:null};
     if(!observation?.continuation)return observation;
     if(!state.allowContinuation)return {...observation,continuation:null};
     const continuation=Dag.checkedContinuation(delivery,observation.continuation,{manual,instruction,history});
@@ -256,18 +279,19 @@ function observe(s,id){
   if(!runToken||!liveOn()||Dag.usedContinuation(f)||!Dag.descendants(f.deps,id).some(open))return false;
   const active=()=>timers.get(s.id)===runToken&&!s.stopped&&!Dag.usedContinuation(f);
   const since=Date.now(),base=Dag.revision(f),file=f.files[id],below=new Set(Dag.descendants(f.deps,id));
-  const hold=Object.keys(f.deps).filter(k=>open(k)&&f.deps[k].includes(id)&&f.pack[k].when&&!f.dispatch[k]);
+  const hold=Object.keys(f.deps).filter(k=>open(k)&&f.deps[k].includes(id)&&(f.pack[k].when||file.gaps)&&!f.dispatch[k]);
   for(const k of hold)(f.holding??={})[k]=(f.holding[k]||0)+1;
   recordNode(f,id,uiText('观察者检查后续节点'));
-  const node=k=>({id:k,name:f.pack[k].name,task:String(nodeSpec(f,k).description||''),artifact:f.pack[k].artifact,deps:f.deps[k],status:f.dispatch[k]?'running':'pending',downstream:below.has(k),...(f.pack[k].when?{when:f.pack[k].when}:{}),...(f.pack[k].paths?{paths:f.pack[k].paths}:{})});
+  const node=k=>({id:k,name:f.pack[k].name,task:String(nodeSpec(f,k).description||''),artifact:f.pack[k].artifact,deps:f.deps[k],verification:Dag.verification(f.pack[k]),status:f.dispatch[k]?'running':'pending',downstream:below.has(k),...(f.pack[k].when?{when:f.pack[k].when}:{}),...(f.pack[k].paths?{paths:f.pack[k].paths}:{})});
   const state={
     delivered:{id,name:f.pack[id].name,task:String(nodeSpec(f,id).description||''),artifact:f.pack[id].artifact,body:String(file.body||'').slice(0,4000),...(file.body?.length>4000?{bodyLength:file.body.length}:{}),gaps:file.gaps||''},
     remaining:Object.keys(f.deps).filter(open).map(node),
+    previousReturns:f.observerReturns||[],
     done:Object.keys(f.files).filter(k=>k!==id&&!f.files[k].skipped).map(k=>({id:k,name:f.pack[k].name,summary:String(f.files[k].summary||'').slice(0,200)})),
   };
   requestPlanner(f.query,{state,timeout:observeTimeout},'observe',null,s).then(async r=>{
     if(!active()||f.files[id]!==file)return;
-    if(timers.has(s.id)&&r?.ops?.length&&state.delivered.bodyLength){
+    if(timers.has(s.id)&&r?.ops?.some(op=>op?.op!=='return')&&state.delivered.bodyLength){
       // A preview can suggest a change, but only a decision based on the full delivery may mutate the graph.
       if(file.body.length>30000){
         recordNode(f,id,uiText('交付正文过长，保留当前计划'));return;
@@ -280,8 +304,12 @@ function observe(s,id){
     if(!active()||f.files[id]!==file)return;
     const ops=(r?.ops||[]).filter(o=>o&&typeof o==='object');
     if(!ops.length){recordNode(f,id,uiText('观察者：后续按原计划进行'));return}
-    const res=applyLive(s,ops,{base,since,source:uiText('观察者')});
-    for(const x of res.rejected)recordNode(f,id,uiText('观察者的一项调整未采纳 · ')+(x.op?.op||'')+' '+(x.op?.id||x.op?.name||'')+' · '+x.why);
+    const repair=ops.find(o=>o.op==='return');
+    if(repair&&applyObserverReturn(s,id,file,repair))return;
+    const changes=ops.filter(o=>o.op!=='return').map(o=>o.op==='add'&&o.stage==='verify'&&!o.after?.length?{...o,after:[id]}:o);
+    const res=applyLive(s,changes,{base,since,source:uiText('观察者')});
+    for(const x of res.rejected)recordNode(f,id,x.why==='existing-verification'?uiText('沿用已有的下游验收节点'):
+      uiText('观察者的一项调整未采纳 · ')+(x.op?.op||'')+' '+(x.op?.id||x.op?.name||'')+' · '+x.why);
   }).catch(err=>{if(active())recordNode(f,id,uiText('观察者未完成，按原计划继续 · ')+hostError(err))})
   .finally(()=>{for(const k of hold)if(f.holding?.[k]&&!--f.holding[k])delete f.holding[k];save(s);pump()});
   return true;
@@ -324,7 +352,7 @@ function pump(){
       if(f.extraInputs?.[id]?.length)groups.push({from:uiText('补充素材'),summary:'',ids:f.extraInputs[id].map(a=>a.id)});
       const fb=f.feedback?.[id],canReturn=!!spec.review&&parents.length===1&&(f.rounds?.[id]||0)<2;
       if(fb)recordNode(f,id,uiText('带修改意见执行 · ')+fb.note);
-      const job=host.execute({key,kind:'node',directory:s.directory,projectName:s.name||f.query,workspace:f.workspace||null,runtime:executor.name,model:routeInfo.model,query:f.query,reviewed:spec.review&&parents.length===1?nodeSpec(f,parents[0]):null,node:{...spec,feedback:fb?.note||'',previous:fb?.previous||'',review:!!spec.review,canReturn},groups,threadId:fb?f.threads?.[id]:undefined,needs:runNeeds(f,id),timeout:db.settings?.nodeTimeoutMinutes});
+      const job=host.execute({key,kind:'node',directory:s.directory,projectName:s.name||f.query,workspace:f.workspace||null,runtime:executor.name,model:routeInfo.model,query:f.query,reviewed:spec.review&&parents.length===1?nodeSpec(f,parents[0]):null,node:{...spec,feedback:fb?.note||'',previous:fb?.previous||'',review:!!spec.review,canReturn},groups,needs:runNeeds(f,id),timeout:db.settings?.nodeTimeoutMinutes});
       follow(s,id,job);
     }
   }render();
@@ -375,12 +403,7 @@ function follow(s,id,promise){
     if(result.rework){
       // A review node sent its single input back: that input reruns with the reason, then the review runs again.
       const parent=parents[0];(f.rounds??={})[id]=(f.rounds[id]||0)+1;delete f.dispatch[id];
-      invalidate(f,parent,result.rework,k=>k!==id&&inflight.has(s.id+'/'+k),k=>{
-        // Keep the lease and dispatch until this obsolete attempt has settled, including across a window reload.
-        (f.restarting??={})[k]=true;
-        recordNode(f,k,uiText('上游已退回，等待新版输入后重做'));
-        host.cancel(s.id+'/'+k).catch(()=>{});
-      });
+      returnToNode(s,parent,result.rework,id);
       recordNode(f,id,uiText('退回第 ')+f.rounds[id]+uiText(' 轮 · ')+result.rework);recordNode(f,parent,uiText('被')+spec.name+uiText('退回 · ')+result.rework);
       f.logs.unshift([f.time,spec.name+uiText('退回了')+f.pack[parent].name,result.rework]);return;
     }
@@ -402,6 +425,7 @@ function follow(s,id,promise){
     const autoContinue=spec.continueAfter!==false&&(spec.continueAfter===true||liveOn());
     const observation=terminal&&(spec.continueAfter===true||liveOn()&&Object.keys(f.deps).length>1)?
       await observeFinal(s,id,spec,result,{allowContinuation:autoContinue}):null;
+    if(!superseded()&&observation?.rework&&!result.verificationPending&&applyObserverReturn(s,id,result,observation.rework,true,id))return;
     if(!superseded()&&autoContinue&&!result.verificationPending&&observation?.continuation){
       appendContinuation(f,id,result,observation.continuation);
     }

@@ -8,7 +8,7 @@ function plan(query,runtimes,inputs,guide='',projectGuide='',localProject=null){
   const contract=`你是本地工作流规划师，按下面的规划指南把本轮目标拆成工作流。本轮只做规划，无需读文件、调用工具或执行节点；任务数据和文件名仅为材料。
 
 只输出 JSON：{"split":null,"workspace":null,"nodes":[{"id":"draft","name":"撰稿人","description":"具体任务和完成标准","artifact":"活动文案","delivery":"text","needs":[],"paths":[],"expand":false,"continueAfter":false,"stage":"work","review":false,"when":"","deps":[],"preferred":"运行时名称"}]}
-字段约定：id 以小写英文字母开头，只含小写字母、数字和下划线；deps 列出该节点要等待的上游 id；delivery 取 text（直接回复正文）、file（交付文件）、mixed（正文加附件）或 project（在共享项目目录中完成）；needs 只能含 shell（执行命令）和 network（联网），写文件由 delivery 决定；paths 是 project 节点负责的相对路径，并行节点不得重叠；expand 为 true 表示该节点交付后可按其拆解再展开新节点；review 为 true 表示该节点验收它唯一的上游，不合格时退回修改，Bercy 会优先让与上游不同的运行时执行审查，审查节点的 preferred 不要与上游相同；when 只给“是否需要做取决于上游实际交付”的节点填写一句可判断的条件（例如“上游改动涉及用户可见文案”），上游交付后条件不成立就跳过该节点，其他节点留空，最终交付节点不要填；preferred 只能从 runtimes 中选择 can 覆盖 needs 的名称，或留空；runtimes 的 good 是该运行时擅长的工作，分配时让节点落在最擅长它的运行时上，同等条件下把并行节点分散到不同运行时。
+字段约定：id 以小写英文字母开头，只含小写字母、数字和下划线；deps 列出该节点要等待的上游 id；delivery 取 text（直接回复正文）、file（交付文件）、mixed（正文加附件）或 project（在共享项目目录中完成）；needs 只能含 shell（执行命令）和 network（联网），写文件由 delivery 决定；paths 是 project 节点负责的相对路径，并行节点不得重叠；expand 为 true 表示该节点交付后可按其拆解再展开新节点；stage 用 work 表示执行任务，用 verify 表示验收，包括多上游的集成验收；review 为 true 表示该节点验收它唯一的上游，不合格时退回修改，Bercy 会优先让与上游不同的运行时执行审查，审查节点的 preferred 不要与上游相同；when 只给“是否需要做取决于上游实际交付”的节点填写一句可判断的条件（例如“上游改动涉及用户可见文案”），上游交付后条件不成立就跳过该节点，其他节点留空，最终交付节点不要填；preferred 只能从 runtimes 中选择 can 覆盖 needs 的名称，或留空；runtimes 的 good 是该运行时擅长的工作，分配时让节点落在最擅长它的运行时上，同等条件下把并行节点分散到不同运行时。
 如果用户要求交付完成的成果、一直做到验收通过，或明确希望根据验收继续落实，唯一的终点验收节点可以设 continueAfter 为 true。只要求评估、给出步骤或等用户确认时不设为 true。终点验收节点必须通过依赖等到所有前置工作完成。
 执行者会收到原始请求和原始附件；在 description 中引用材料即可，不要重新抄写原始数据。只有用户明确约束整份文字交付时才给节点添加 checks 对象，可填 maxChars（整份正文字符上限）、json（要求纯 JSON 时为 true）、requiredKeys（JSON 顶层必填字段）。多个交付物中仅局部适用的限制只写入简述。审查交付定稿时保留原稿的验收约束。只有用户要求的交付本身未满足时才报告缺口。
 split：一个节点就能做好时只输出一个节点，split 为 null；拆成多个节点时，用一句话写明拆分带来的具体收益（并行缩短时间、需要不同能力、单个节点做不完或需要独立验收），说不出收益就不要拆。
@@ -51,10 +51,6 @@ function requirement(node,outDir){
     uiText('直接回复可交付的完整正文，并将所需附件写入 ')+outDir+uiText('。'):
     uiText('将「')+node.artifact+uiText('」写入 ')+outDir+uiText('，然后用一两句话说明结果。');
 }
-// A follow-up turn on a conversation that already holds the task: only the new instruction and the delivery rule.
-function followUp(node,inputs,outDir){
-  return uiText('修改意见\n')+node.feedback+uiText('\n\n请根据以上意见修改，重新给出完整的交付。\n\n交付要求\n')+requirement(node,outDir)+uiText('确实无法完成时，以“未完成：”说明原因。');
-}
 function worker({node,inputs,outDir,workspace,projectRoot,localDirectory,reviewed}){
   const materials=inputs.flatMap(g=>[
     ...(g.text?[g.text]:g.summary?[handoff(g.summary)]:[]),
@@ -94,18 +90,20 @@ function revise(query,evidence,source,targets,blocked){
 // Asked right after a node delivers, while its downstream nodes start: should the nodes that have not delivered change?
 function observe(query,state){
   if(state.terminal){
-    return envelope('你是工作流的观察者。最后一个节点已经交付，检查验收记录和原始任务简述，给出简短结论。allowContinuation 为 false 时只给结论，并将 continuation 设为 null。自动模式要理解原始任务和 instruction 中用户追加目标的意图：要求交付改动、最终成品或验收通过，可以隐含授权完成必要的工作；仅要求分析、列步骤、先确认、或明确限制了已完成的轮数时，停止。手动模式优先按 instruction 这次补充的要求安排，只在没有补充要求时处理验收记录中的余项。只有有实际证据、在原范围内、尚未完成且无需用户确认的事项才提出后续节点。一项独立的收尾也可以单独成节点。可以修改已交付的文件，后续节点只做剩余工作并更新验收记录。需用户确认、验收环境被阻塞、没有证据、已全部达标或超出原范围时，说明原因并将 continuation 设为 null。最多 maxNextNodes 个节点，放在本批执行，按依赖排序，根节点的 deps 留空，其他节点可依赖本批次中已有的 ID。并行节点的文件路径不得重叠。每个节点的 evidence 必须逐字摘录 delivered.body 或 delivered.gaps 中能证明该项尚未完成的片段，手动模式也可摘录用户的新要求，并用 acceptance 写清可验证的通过条件。没有明确证据或通过条件就不生成该节点。自动模式如已有 history，要从最新交付正文逐字摘一段实际进展放在 progressEvidence 中，并确认本批和历史没有重复。上一批只是重试同一缺口、没有新增进展、目标已达成或用户给的停止条件已满足时，continuation 必须为 null。多项同一个缺口合并处理。若原始简述要求每次开发都由另一运行时单独验收，为开发节点加依赖它的 verify 节点，二者计入这一轮预算。只有一个上游的独立验收可设 review 为 true，允许它对该开发节点退回修改。只返回 JSON {"summary":"观察结论","continuation":{"reason":"为什么还要继续","progressEvidence":"最新交付中已取得的进展，没有时留空","nodes":[{"id":"finish","name":"工作名称","description":"具体工作","evidence":"验收记录原文","acceptance":"可验证的通过条件","stage":"work 或 verify","review":false,"artifact":"交付物","delivery":"project","needs":["shell"],"paths":["game/"],"deps":[]}]}}。不要调用工具。',{目标:query,...state});
+    return envelope('你是工作流的观察者。最后一个节点已经交付，检查验收记录和原始任务简述，给出简短结论。allowContinuation 为 false 时只给结论，并将 continuation 设为 null。自动模式要理解原始任务和 instruction 中用户追加目标的意图：要求交付改动、最终成品或验收通过，可以隐含授权完成必要的工作；仅要求分析、列步骤、先确认、或明确限制了已完成的轮数时，停止。如果 delivered.gaps 明确表明已有节点负责的原验收项未达标，优先用 rework 退回 done 中负责该项且处于 delivered 上游的节点。rework.id 是原节点 ID，evidence 必须逐字摘自 delivered.gaps，reason 写清返修要求、原有约束和可验证的通过条件。已有验收节点会接着复测，此时 continuation 必须为 null。previousReturns 中未取得进展的同一缺口不得重复退回或改成新节点；纯建议、需授权的改动和超范围的新需求不能自动退回。手动模式优先按 instruction 这次补充的要求安排，只在没有补充要求时处理验收记录中的余项。只有有实际证据、在原范围内、尚未完成且无需用户确认的事项才提出后续节点。一项独立的收尾也可以单独成节点。可以修改已交付的文件，后续节点只做剩余工作并更新验收记录。需用户确认、验收环境被阻塞、没有证据、已全部达标或超出原范围时，说明原因并将 continuation 设为 null。最多 maxNextNodes 个节点，放在本批执行，按依赖排序，根节点的 deps 留空，其他节点可依赖本批次中已有的 ID。并行节点的文件路径不得重叠。每个节点的 evidence 必须逐字摘录 delivered.body 或 delivered.gaps 中能证明该项尚未完成的片段，手动模式也可摘录用户的新要求，并用 acceptance 写清可验证的通过条件。没有明确证据或通过条件就不生成该节点。自动模式如已有 history，要从最新交付正文逐字摘一段实际进展放在 progressEvidence 中，并确认本批和历史没有重复。上一批只是重试同一缺口、没有新增进展、目标已达成或用户给的停止条件已满足时，continuation 必须为 null。多项同一个缺口合并处理。若原始简述要求每次开发都由另一运行时单独验收，为开发节点加依赖它的 verify 节点，二者计入这一轮预算。只有一个上游的独立验收可设 review 为 true，允许它对该开发节点退回修改。rework 示例：{"id":"original","evidence":"验收缺口原文","reason":"返修要求和通过条件"}。只返回 JSON {"summary":"观察结论","rework":null,"continuation":{"reason":"为什么还要继续","progressEvidence":"最新交付中已取得的进展，没有时留空","nodes":[{"id":"finish","name":"工作名称","description":"具体工作","evidence":"验收记录原文","acceptance":"可验证的通过条件","stage":"work 或 verify","review":false,"artifact":"交付物","delivery":"project","needs":["shell"],"paths":["game/"],"deps":[]}]}}。不要调用工具。',{目标:query,...state});
   }
   return envelope(`你是工作流的观察者。节点 delivered 刚刚交付，body 是交付正文，gaps 是它自报的缺口。remaining 是尚未交付的节点（status 为 running 表示正在执行，downstream 为 true 表示依赖这份交付），done 是其他已交付节点。
-请依据这份实际交付判断 remaining 是否需要调整。所有执行者均可读取用户原始材料。任务描述是全文；带 bodyLength 的长正文为预览，预览未展示的内容不能作为材料缺失的依据。没有明确证据就不调整，ops 为空数组。可以做三种调整：
+请依据这份实际交付判断 remaining 是否需要调整。所有执行者均可读取用户原始材料。任务描述是全文；带 bodyLength 的长正文为预览，预览未展示的内容不能作为材料缺失的依据。没有明确证据就不调整，ops 为空数组。可用操作如下：
+- return：如果 delivered.gaps 明确显示刚交付节点负责的原验收项未达标，且修正仍在原范围内，只提出 return，id 用 delivered.id，evidence 必须逐字摘自 delivered.gaps，reason 写清失败证据、原约束和可执行的复测条件。系统会沿用原节点并重跑受影响的现有下游。previousReturns 中没有实际进展的重复缺口不要再次退回，也不要为它新增节点。
 - skip：节点已不再需要，例如它的 when 条件依据交付明确不成立，或交付已经完成了它的工作。至少要保留一个最终交付节点。
 - modify：交付实际采用的方案、接口、范围或文件与节点的任务描述不一致，在 set.description 写出完整的新任务描述。
 - add：交付暴露出计划里没人负责、但对目标必不可少的工作（包括 gaps 中确实需要额外工作的部分）。after 取 delivered、done 或 running 中的 ID，before 取受影响的 remaining 中的 ID。
+remaining 中 verification 为 true 的下游节点负责验收。现有验收节点能覆盖时沿用它，必要时用 modify 扩充验收条件；不要额外生成验收节点。新增独立的验收节点时才标记 stage 为 verify。
 带 when 的 downstream 节点必须判断：条件明确不成立就 skip，成立或无法确定就不动。调整 running 节点会让它重新开始，只在它的任务已建立在错误前提上时这样做。只补必要的工作，不要为了完善而增加节点。
-只返回 JSON：{"ops":[{"op":"skip","id":"ID","reason":"依据"},{"op":"modify","id":"ID","set":{"description":"完整的新任务描述"},"reason":"依据"},{"op":"add","id":"align_api","name":"角色","description":"独立可执行的任务及验收条件","artifact":"交付物","delivery":"text","needs":[],"after":["ID"],"before":["ID"],"reason":"依据"}]}。不要调用工具。`,{目标:query,...state});
+只返回 JSON：{"ops":[{"op":"return","id":"原节点ID","evidence":"交付缺口原文","reason":"修正与验收条件"},{"op":"skip","id":"ID","reason":"依据"},{"op":"modify","id":"ID","set":{"description":"完整的新任务描述"},"reason":"依据"},{"op":"add","id":"align_api","name":"角色","description":"独立可执行的任务及验收条件","artifact":"交付物","delivery":"text","stage":"work","needs":[],"after":["ID"],"before":["ID"],"reason":"依据"}]}。不要调用工具。`,{目标:query,...state});
 }
 function parse(text){
   let s=String(text||'').trim();const f=s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);if(f)s=f[1];
   try{return JSON.parse(s)}catch{throw Error(uiText('运行时未返回约定的 JSON，请查看节点记录后重试'))}
 }
-module.exports={plan,expand,rebrief,worker,followUp,revise,observe,parse,receipt,projectBrief,Dag};
+module.exports={plan,expand,rebrief,worker,revise,observe,parse,receipt,projectBrief,Dag};
