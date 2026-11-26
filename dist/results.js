@@ -40,20 +40,38 @@ answerMd.renderer.rules.link_close=(_tokens,_i,_options,env)=>{
 };
 answerMd.renderer.rules.image=(tokens,i,options,env)=>{
   const token=tokens[i],alt=esc(token.content),item=linkedFile(token,'src',env);
+  const asset=item?.type?.startsWith('image/')?item:null;
   const photo=projectImage(projectHref(token.attrGet('src'),env),env.project);
   if(env.inlineProjectImages&&photo){
     env.inlineProjectImages.add(photo.url);
     if(!env.linkEnd)return inlineProjectImage(photo,'<span>'+alt+'</span>');
   }
-  const url=host&&item?.type.startsWith('image/')?'relay-asset://file/'+item.id:photo?.url;
+  const url=host&&asset?'relay-asset://file/'+asset.id:photo?.url;
   if(!url)return alt;
-  env.previews?.embedded.add(url);
+  if(env.previews){
+    env.previews.embedded.add(url);
+    env.previews.links.set(url,asset?{url,name:asset.name,asset}:photo);
+  }
   return '<img src="'+esc(url)+'" alt="'+alt+'" loading="lazy">';
 };
 function richAnswer(body,assets=[],project='',previews){return '<div class="answer-md md">'+answerMd.render(body||'',{assets,project,previews})+'</div>'}
 function answerImage({url,name,asset}){
+  const source=asset&&!host?'data-picture="'+esc(asset.id)+'"':'src="'+esc(url)+'"';
   return '<figure class="dock-image"><button type="button" '+(asset?'data-asset="'+esc(asset.id)+'"':'data-project-image')+
-    ' aria-label="'+esc(uiText('放大 ')+name)+'"><img src="'+esc(url)+'" alt="'+esc(name)+'" loading="lazy"></button><figcaption>'+esc(name)+'</figcaption></figure>';
+    ' aria-label="'+esc(uiText('放大 ')+name)+'"><img '+source+' alt="'+esc(name)+'" loading="lazy"></button><figcaption>'+esc(name)+'</figcaption></figure>';
+}
+function shelfDeliverables(file,sessionId){
+  const images=new Map(),other=[];
+  for(const asset of file.artifacts||[]){
+    if(asset.type?.startsWith('image/')){
+      const url='relay-asset://file/'+asset.id;
+      images.set(url,{url,name:asset.name,asset});
+    }else other.push(asset);
+  }
+  if(host&&file.delivery==='project'&&file.body){
+    answerMd.render(file.body,{project:sessionId,previews:{links:images,embedded:new Set()}});
+  }
+  return (images.size?'<div class="shelf-images">'+[...images.values()].map(answerImage).join('')+'</div>':'')+assetLinks(other);
 }
 function testReport(doc,project,shown){
   const section=doc.tests.map(test=>{
@@ -150,6 +168,11 @@ function fillProjects(root){
   }
 }
 document.addEventListener('click',e=>{
+  const image=e.target.closest('[data-project-image]')?.querySelector('img');
+  if(image){
+    if(image.naturalWidth)dialog(uiText('本地产物'),image.alt,'<img class="media-preview" src="'+esc(image.currentSrc)+'" alt="'+esc(image.alt)+'">');
+    return;
+  }
   const b=e.target.closest('[data-open-project]');if(b){host.openProject(b.dataset.openProject).catch(err=>notify(err.message));return}
   const link=e.target.closest('[data-project-file]');
   if(link){e.preventDefault();host.openProjectFile(link.dataset.projectId,link.dataset.projectFile).then(r=>notify(r==='opened'?uiText('已用默认应用打开 ')+link.dataset.projectFile:uiText('已在 Finder 中显示 ')+link.dataset.projectFile)).catch(err=>notify(String(err.message||err).replace(/^Error invoking remote method '[^']+': Error: /,'')))}
@@ -303,11 +326,6 @@ document.getElementById('answer').addEventListener('keydown',e=>{
   if(e.key==='Escape'){e.preventDefault();toggleAnswer(false)}
 });
 document.getElementById('answer').onclick=async e=>{
-  const image=e.target.closest('[data-project-image]')?.querySelector('img');
-  if(image){
-    if(image.naturalWidth)dialog(uiText('本地产物'),image.alt,'<img class="media-preview" src="'+esc(image.currentSrc)+'" alt="'+esc(image.alt)+'">');
-    return;
-  }
   const open=e.target.closest('[data-open]')?.dataset.open;
   if(open){host.open(open).catch(err=>notify(err.message));return}
   const k=e.target.closest('[data-copy]')?.dataset.copy;

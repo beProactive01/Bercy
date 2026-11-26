@@ -5,6 +5,7 @@ const stamp=t=>String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStar
 const uid=()=>crypto.randomUUID();
 const key='relay-room.client.v1',timers=new Map(),closedGroups=new Set(),defaultSettings={languagePreference:'system',nodeTimeoutMinutes:0,parallel:4,autoStart:true,planner:'',approval:'auto',expand:'auto'};
 let db,run,view='graph',inspected=null,shownNode=null,pausedForEdit=null,toastTimer,speed=1;
+let renderedRows;
 function session(){return db.sessions.find(s=>s.id===db.selected)}
 function project(id){return db.projects.find(p=>p.id===id)}
 function fresh(query,projectId,definition){
@@ -246,8 +247,12 @@ function render(){
   renderAnswerDock(s,done);renderApprovals();$('approvalChip').hidden=!host;
   if(view==='graph')graph();else{
     $('listtitle').textContent=view==='log'?uiText('执行记录'):uiText('产物架');
-    $('rows').innerHTML=view==='log'?run.logs.map(activityLine).map(([t,a,b])=>'<div class="log"><time>'+stamp(t)+'</time><div><b>'+esc(String(a).replace(/([\u4e00-\u9fff])(?=[A-Za-z0-9])/g,'$1 '))+'</b><p>'+esc(plainLine(String(b??'').replace(/^\s*(?:-{3,}|\*{3,})\s*$/gm,'')))+'</p></div></div>').join(''):
-      files.length?files.reverse().map(([k,f])=>'<section class="file-group"><button class="log file" data-file="'+k+'"><time>'+stamp(f.time)+'</time><div><b>'+esc(f.title)+'</b><p>'+esc(displayRole(run,k).name)+' · '+(f.delivery==='file'?uiText('文件交付'):f.delivery==='project'?uiText('项目目录'):f.delivery==='mixed'?uiText('正文和附件'):uiText('查看交付'))+'</p></div></button>'+assetLinks(f.artifacts)+'</section>').join(''):uiText('<p class="empty">节点完成后，正文和文件都会出现在这里。</p>');
+    const rows=view==='log'?run.logs.map(activityLine).map(([t,a,b])=>'<div class="log"><time>'+stamp(t)+'</time><div><b>'+esc(String(a).replace(/([\u4e00-\u9fff])(?=[A-Za-z0-9])/g,'$1 '))+'</b><p>'+esc(plainLine(String(b??'').replace(/^\s*(?:-{3,}|\*{3,})\s*$/gm,'')))+'</p></div></div>').join(''):
+      files.length?files.reverse().map(([k,f])=>'<section class="file-group"><button class="log file" data-file="'+k+'"><time>'+stamp(f.time)+'</time><div><b>'+esc(f.title)+'</b><p>'+esc(displayRole(run,k).name)+' · '+(f.delivery==='file'?uiText('文件交付'):f.delivery==='project'?uiText('项目目录'):f.delivery==='mixed'?uiText('正文和附件'):uiText('查看交付'))+'</p></div></button>'+shelfDeliverables(f,s.id)+'</section>').join(''):uiText('<p class="empty">节点完成后，正文和文件都会出现在这里。</p>');
+    if(rows!==renderedRows){
+      $('rows').innerHTML=rows;renderedRows=rows;
+      if(view==='files'&&!host)materializeFiles($('rows'));
+    }
   }
   if(shownNode&&$('modal').open)nodeBody(shownNode,true);
 }

@@ -156,6 +156,17 @@
 .dock-image button:hover { border-color: var(--dock-muted) }
 .dock-image img { display: block; width: 100%; max-height: 72vh; object-fit: contain }
 .dock-image figcaption { margin: 6px 0 0; font-size: 12px; color: var(--dock-muted) }
+.shelf-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(245px, 100%), 1fr));
+  align-items: start;
+  gap: 16px;
+  max-width: 1056px;
+  margin: 12px 0 20px;
+  --dock-rule: var(--line);
+  --dock-muted: var(--sub);
+}
+.shelf-images img { max-height: min(400px, 50vh) }
 .dock-project-deliveries:empty { display: none }
 .dock-project-preview {
   margin: 24px 0;
