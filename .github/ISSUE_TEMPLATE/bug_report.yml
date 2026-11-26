@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in Bercy doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect Codex and Claude Code
+        2. Start a multi-agent workflow with "..."
+        3. ...
+  - type: input
+    id: version
+    attributes:
+      label: Bercy version
+      description: The release you downloaded, or "source" and the commit if you run from source.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+    validations:
+      required: true
+  - type: input
+    id: runtimes
+    attributes:
+      label: Runtimes involved
+      description: For example Codex 0.x and Claude Code 2.x.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Node events or error messages
+      description: Copy from the node panel. Remove anything private first.
+      render: text

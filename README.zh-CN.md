@@ -6,6 +6,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/beProactive01/Bercy/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/beProactive01/Bercy"></a>
+  <a href="https://github.com/beProactive01/Bercy/actions/workflows/test.yml"><img alt="测试" src="https://github.com/beProactive01/Bercy/actions/workflows/test.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="MIT 许可证" src="https://img.shields.io/github/license/beProactive01/Bercy"></a>
+  <img alt="macOS Apple Silicon" src="https://img.shields.io/badge/macOS-Apple%20Silicon-black">
+</p>
+
+<p align="center">
   <b>简体中文</b> · <a href="README.md">English</a> · <a href="#实际效果">操作演示</a> · <a href="#快速开始">快速开始</a> · <a href="#和其他用法的区别">为什么用百溪</a> · <a href="#运行时">运行时</a>
 </p>
 
@@ -63,7 +70,17 @@
 
 ## 快速开始
 
-[下载 Bercy 安装包（Apple Silicon，.dmg）](https://github.com/beProactive01/Bercy/releases/download/v0.1.14/Bercy-0.1.14-arm64.dmg)。打开磁盘映像，把 Bercy 拖到「应用程序」后启动。
+百溪目前支持搭载 Apple Silicon 的 Mac，暂不支持 Windows 和 Intel Mac。
+
+[下载 Bercy 安装包（Apple Silicon，.dmg）](https://github.com/beProactive01/Bercy/releases/download/v0.1.14/Bercy-0.1.14-arm64.dmg)，其他版本见 [Releases](https://github.com/beProactive01/Bercy/releases)。打开磁盘映像，把 Bercy 拖到「应用程序」。
+
+应用还没有经过公证，第一次打开会被 macOS 拦下。在终端运行一次下面的命令，之后就能正常打开：
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Bercy.app
+```
+
+也可以先尝试打开一次，再到 **系统设置 → 隐私与安全性** 点击 **仍要打开**。
 
 从源码运行需要 Node.js 和 npm，项目已在 Node.js 26.5 下测试。
 
@@ -110,11 +127,13 @@ npm test              # 运行测试
 npm run package:mac   # 打包 Apple Silicon 版应用和 DMG，输出到 build/
 ```
 
-打包出的应用使用临时签名，没有经过公证。首次打开时，在“应用程序”里右键点按 Bercy 并选择**打开**，或者运行 `xattr -dr com.apple.quarantine /Applications/Bercy.app`。
-
 用 `npm run test:regression` 运行真实 Codex 回归集。只测代码开发、修改和测试生成时，运行 `npm run test:regression -- coding`。[回归集说明](regression/README.md)
 
 [规划指南](desktop/planning-guide.md) · [工作流机制与提示词](工作流机制与提示词.md) · [提示词实现](desktop/prompts.cjs) · [桌面主进程](desktop/) · [画布与调度](dist/)
+
+## 参与贡献
+
+欢迎提交问题报告、新的运行时适配和工作流文件。开发环境和提交要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 许可证
 

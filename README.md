@@ -6,6 +6,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/beProactive01/Bercy/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/beProactive01/Bercy"></a>
+  <a href="https://github.com/beProactive01/Bercy/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/beProactive01/Bercy/actions/workflows/test.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/beProactive01/Bercy"></a>
+  <img alt="macOS on Apple Silicon" src="https://img.shields.io/badge/macOS-Apple%20Silicon-black">
+</p>
+
+<p align="center">
   <b>English</b> · <a href="README.zh-CN.md">简体中文</a> · <a href="#see-it-work">Demos</a> · <a href="#quick-start">Quick start</a> · <a href="#how-bercy-is-different">Why Bercy</a> · <a href="#runtimes">Runtimes</a>
 </p>
 
@@ -63,7 +70,17 @@ Double-click the canvas to add a node. Drag the output ports of **Draft copy** a
 
 ## Quick start
 
-[Download Bercy for Apple Silicon (.dmg)](https://github.com/beProactive01/Bercy/releases/download/v0.1.14/Bercy-0.1.14-arm64.dmg). Open the disk image, drag Bercy into Applications, then launch it.
+Bercy runs on Macs with Apple Silicon. Windows and Intel Macs aren't supported yet.
+
+[Download Bercy for Apple Silicon (.dmg)](https://github.com/beProactive01/Bercy/releases/download/v0.1.14/Bercy-0.1.14-arm64.dmg), or pick a version from [Releases](https://github.com/beProactive01/Bercy/releases). Open the disk image and drag Bercy into Applications.
+
+The app isn't notarized yet, so macOS blocks it the first time. Run this once in Terminal, then open Bercy as usual:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Bercy.app
+```
+
+Or try to open Bercy, then go to **System Settings → Privacy & Security** and choose **Open Anyway**.
 
 To run from source, install Node.js and npm. The project is tested with Node.js 26.5.
 
@@ -110,11 +127,13 @@ npm test              # run the test suite
 npm run package:mac   # write the Apple Silicon app and DMG to build/
 ```
 
-The packaged app is ad-hoc signed and not notarized. The first time you open it, right-click Bercy in Applications and choose **Open**, or run `xattr -dr com.apple.quarantine /Applications/Bercy.app`.
-
 Run the real Codex regression cases with `npm run test:regression`. To test code development, changes and test generation only, use `npm run test:regression -- coding`. [Regression guide](regression/README.md)
 
 [Planning guide](desktop/planning-guide.en.md) · [Workflow and prompt notes (Chinese)](工作流机制与提示词.md) · [Prompt implementation](desktop/prompts.cjs) · [Desktop process](desktop/) · [Canvas and scheduler](dist/)
+
+## Contributing
+
+Bug reports, runtime adapters and workflow files are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up.
 
 ## License
 
