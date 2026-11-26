@@ -74,3 +74,14 @@ test('reading a workflow file rejects foreign, broken or cyclic content',()=>{
   assert.equal(r.definition.roles.a.evil,undefined);assert.equal(r.definition.overrides.a.command,undefined);
   assert(r.definition.roles.a.description.length<=2400);
 });
+
+test('a review of a project node is told to read the code in the project directory',()=>{
+  const prompts=require('../prompts.cjs');
+  const reviewed={description:'实现水位系统',artifact:'水位系统',delivery:'project',paths:['src/water/']};
+  const node={description:'审查水位系统',artifact:'审查结论',delivery:'text',review:true,canReturn:true};
+  const w=prompts.worker({node,inputs:[],outDir:'/o',localDirectory:'/p/game',reviewed});
+  assert.ok(w.includes('项目目录\n/p/game'));assert.match(w,/实际代码/);assert.match(w,/不要修改任何文件/);
+  // A review of text, or a project review without a directory, gets no such instruction.
+  assert.doesNotMatch(prompts.worker({node,inputs:[],outDir:'/o',localDirectory:'/p/game',reviewed:{...reviewed,delivery:'text'}}),/实际代码/);
+  assert.doesNotMatch(prompts.worker({node,inputs:[],outDir:'/o',reviewed}),/实际代码/);
+});

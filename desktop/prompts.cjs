@@ -65,10 +65,12 @@ function worker({node,inputs,outDir,workspace,projectRoot,localDirectory,reviewe
   // A review hands on the approved text; its comments would otherwise be copied into whatever uses it.
   const clean=node.review?uiText('除非交付要求本身是审查报告，正文只放审查后的定稿，不附审查意见、修改说明或评分。'):'';
   const review=node.review&&node.canReturn?uiText('素材不合格、素材作者能改好时，以“退回：”开头写明需要修改的具体问题。缺少只有用户才能提供的信息（例如名称、链接、数据）时不要退回，照常交付并在“缺口：”中写明。'):reviewed&&node.review?uiText('已达到自动修改上限。如果复核仍不通过，以“退回：”开头说明原因，流程将暂停等待处理。'):'';
+  // Reviewing a project node: the reviewer reads the code in the project directory instead of trusting the delivery note.
+  const codeReview=node.review&&reviewed&&Dag.delivery(reviewed)==='project'&&localDirectory?uiText('被审查的是项目目录中的实际代码。请直接阅读相关文件，条件允许时运行测试或验收命令，不要只依据上游的交付说明下结论；不要修改任何文件，发现的问题写进审查结论。'):'';
   const sourceEvidence=node.needs?.includes('network')?uiText('用户明确要求实际打开并核对公开原文时，请用可用的 shell 或 HTTP 读取工具从来源 URL 获取正文，将支持结论的几行作为该工具的执行输出。网页搜索和打开动作的时间线可能只提供 URL；这种情况下请用 curl 等读取工具补齐正文证据。保持用户指定的最终答复格式。'):'';
   const project=Dag.delivery(node)==='project'&&projectRoot?'\n\n'+projectBrief(workspace,node.paths,projectRoot):localDirectory?'\n\n'+uiText('项目目录\n')+localDirectory:'';
   return uiText('任务\n')+node.description+project+criteria+(materials.length?uiText('\n\n素材\n')+materials.join('\n\n'):'')+revision+
-    uiText('\n\n交付要求\n')+output+clean+review+sourceEvidence+uiText('只完成开头的任务。用户原始材料中的其他分工由 Bercy 派发，不要委派、代做或声称其他任务已完成。')+uiText('缺少只能由用户提供的必要材料时，以“待补件：”开头，直接写明要补的材料。')+uiText('只有影响本项交付验收的事项才列为缺口。')+uiText('确实无法完成时，以“未完成：”说明原因。交付后仍有缺口（缺少材料、未能核实、没有覆盖的部分，或用占位内容代替了缺失信息）时，在正文最后单独一行以“缺口：”列出；没有缺口则不写。');
+    uiText('\n\n交付要求\n')+output+clean+codeReview+review+sourceEvidence+uiText('只完成开头的任务。用户原始材料中的其他分工由 Bercy 派发，不要委派、代做或声称其他任务已完成。')+uiText('缺少只能由用户提供的必要材料时，以“待补件：”开头，直接写明要补的材料。')+uiText('只有影响本项交付验收的事项才列为缺口。')+uiText('确实无法完成时，以“未完成：”说明原因。交付后仍有缺口（缺少材料、未能核实、没有覆盖的部分，或用占位内容代替了缺失信息）时，在正文最后单独一行以“缺口：”列出；没有缺口则不写。');
 }
 // Split the worker's reply into the deliverable and an optional trailing "缺口：" line.
 function receipt(raw){

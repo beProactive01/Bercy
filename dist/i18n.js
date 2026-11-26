@@ -989,6 +989,7 @@ const BercyI18n = (() => {
     "查看输出": "View output",
     "复核未通过": "Review failed",
     "上游已退回，等待新版输入后重做": "Upstream returned for revision. Will rerun with the updated input.",
+    "被审查的是项目目录中的实际代码。请直接阅读相关文件，条件允许时运行测试或验收命令，不要只依据上游的交付说明下结论；不要修改任何文件，发现的问题写进审查结论。": " You are reviewing the actual code in the project directory. Read the relevant files and run the tests or acceptance command when you can, rather than relying on the upstream delivery note. Do not modify any files; put the issues you find in your review.",
     "已达到自动修改上限。如果复核仍不通过，以“退回：”开头说明原因，流程将暂停等待处理。": " The revision limit has been reached. If the review still fails, start with “Return:” and give the reason so the workflow pauses for attention.",
     "用户明确要求实际打开并核对公开原文时，请用可用的 shell 或 HTTP 读取工具从来源 URL 获取正文，将支持结论的几行作为该工具的执行输出。网页搜索和打开动作的时间线可能只提供 URL；这种情况下请用 curl 等读取工具补齐正文证据。保持用户指定的最终答复格式。": " When explicitly asked to open and verify a public source, use an available shell or HTTP reader to fetch the source URL and output the supporting lines directly from the response. Search and open-page timeline events can show only the URL; in that case use a reader such as curl to capture the source text. Keep the requested final answer format.",
     "页内查找 ·": "Find in page ·",

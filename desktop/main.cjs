@@ -260,7 +260,7 @@ async function execute(req){
   const runApprovalMode=approvalMode;
   try{
     const dbg=(...a)=>process.env.RELAY_DEBUG&&console.log('[execute]',req.key,...a);dbg('begin');
-    cwd=await files.attempt();let prompt,images=[],sentInputs=[];dbg('attempt');
+    cwd=await files.attempt();let prompt,images=[],sentInputs=[],reviewRoot='';dbg('attempt');
     const selected=localDirectory(req.directory);
     if(req.kind==='plan')prompt=prompts.plan(req.query,req.available,req.attachments||[],planningGuide(),String(req.projectGuide||'').slice(0,8000),selected?{directory:selected,files:[...(await project.snapshot(selected,300)).keys()]}:null);
     else if(req.kind==='brief')prompt=prompts.rebrief(req.query,req.definition);
@@ -279,6 +279,11 @@ async function execute(req){
         if(job.paths.length)job.before=await project.snapshot(job.project);
         if(!selected){job.inputDir=path.join(job.project,'.relay',path.basename(cwd));fs.mkdirSync(job.inputDir,{recursive:true})}
       }
+      // A review of a project node works in that project, so it checks the actual code rather than the upstream's own account of it.
+      if(!job.project&&!selected&&req.node.review&&req.reviewed&&prompts.Dag.delivery(req.reviewed)==='project'){
+        const root=projectRoot(String(req.key).split('/')[0],req.projectName);
+        if(fs.existsSync(root))reviewRoot=root;
+      }
       const inputRoot=job.inputDir||cwd;
       const inputs=await files.budget(inputRoot,await files.inputs(inputRoot,req.groups));
       const spilled=inputs.filter(g=>g.spilled).map(g=>g.title||uiText('上游交付'));
@@ -287,7 +292,7 @@ async function execute(req){
       const pictures=inputs.flatMap(g=>g.files).filter(f=>['image/png','image/jpeg','image/webp','image/gif'].includes(f.type));
       if(runner.supportsImages){images=pictures;for(const f of pictures)f.visual=true}
       if(pictures.length)send({key:req.key,message:(images.length?uiText('图像直传 · '):uiText('图片文件输入 · '))+pictures.map(f=>f.name).join('、')});
-      prompt=prompts.worker({...req,inputs,outDir:path.join(cwd,'out'),workspace:req.workspace,projectRoot:job.project,localDirectory:selected});
+      prompt=prompts.worker({...req,inputs,outDir:path.join(cwd,'out'),workspace:req.workspace,projectRoot:job.project,localDirectory:selected||reviewRoot});
     }else throw Error(uiText('不支持的执行类型'));
     const node=req.kind==='node';dbg('prompt ready');
     if(node)send({key:req.key,prompt,sentInputs});
@@ -310,7 +315,7 @@ async function execute(req){
       if(x.delta!=null){const now=Date.now();if(now-lastDelta<120)return;lastDelta=now;send({key:req.key,delta:x.delta.slice(-20000)});return}
       if(x.step){send({key:req.key,step:x.step});if(x.step.status!=='running')store.log(...ids(req.key),'step',x.step)}
     };
-    const opts={name:runner.name,bin:runner.bin,scope,protocol:runner.protocol,args:runner.args,model:req.model,cwd:selected||job.project||cwd,attemptDir:cwd,extraDirectory:selected&&req.kind==='node'?cwd:undefined,images,signal:controller.signal,report,
+    const opts={name:runner.name,bin:runner.bin,scope,protocol:runner.protocol,args:runner.args,model:req.model,cwd:selected||job.project||reviewRoot||cwd,attemptDir:cwd,extraDirectory:(selected||reviewRoot)&&req.kind==='node'?cwd:undefined,images,signal:controller.signal,report,
       usage:value=>{if(node)send({key:req.key,usage:value})},planning:!node,persistThread,captureSources:node&&req.node.needs?.includes('network'),needs,timeout:minutes*60*1000,approvalMode:runApprovalMode,
       approve:request=>ask(req.key,runner,req.node?.name||'',request)};
     dbg('invoke');
