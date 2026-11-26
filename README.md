@@ -63,7 +63,9 @@ Double-click the canvas to add a node. Drag the output ports of **Draft copy** a
 
 ## Quick start
 
-Bercy currently runs from source on Apple Silicon Macs. You need Node.js and npm. The project is tested with Node.js 26.5.
+[Download Bercy for Apple Silicon (.dmg)](https://github.com/beProactive01/Bercy/releases/download/v0.1.14/Bercy-0.1.14-arm64.dmg). Open the disk image, drag Bercy into Applications, then launch it.
+
+To run from source, install Node.js and npm. The project is tested with Node.js 26.5.
 
 ```sh
 npm ci

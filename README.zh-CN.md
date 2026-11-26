@@ -63,7 +63,9 @@
 
 ## 快速开始
 
-目前需要从源码运行，仅支持 Apple Silicon 的 Mac。需要 Node.js 和 npm，项目已在 Node.js 26.5 下测试。
+[下载 Bercy 安装包（Apple Silicon，.dmg）](https://github.com/beProactive01/Bercy/releases/download/v0.1.14/Bercy-0.1.14-arm64.dmg)。打开磁盘映像，把 Bercy 拖到「应用程序」后启动。
+
+从源码运行需要 Node.js 和 npm，项目已在 Node.js 26.5 下测试。
 
 ```sh
 npm ci
