@@ -1,0 +1,105 @@
+:root { color-scheme: light dark; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #eeeaf3;
+    --sub: #b9b1c6;
+    --line: #45404d;
+    --accent: #c2a9ff;
+    --wash: #393048;
+    --surface: #252329;
+    --inset: #1e1c23;
+    --raised: #302c36;
+    --success: #9fd4b7;
+    --warning: #edc684;
+    --danger: #ffada6;
+    color: var(--ink);
+    background: #19181e;
+  }
+
+  aside, #preferences, #library { background: var(--inset); }
+  button:hover:enabled { background-color: var(--raised); }
+  .new, dialog, dialog .dlghead, .chip, .secondary, .mapbar select, .tools,
+  .demobox summary, .demolist, .connection, .flowcard, .library-empty,
+  .fieldinput, textarea, .select, .configrow select, .model-trigger,
+  .rt-picker button[role=combobox], .choice-list, .model-panel, .row-menu,
+  .top .save-action, .inlinebrief, .project-card, .approval-card,
+  .attachment-chip, .io .attachbox, .board-panel, .bnode, .approval-chip select {
+    background: var(--surface);
+    border-color: var(--line);
+  }
+  dialog::backdrop, .mobileopen #scrim { background: #08070ca6; }
+  .projecthead button, .sent-text, .top .save-action, .need-picks label { color: var(--ink); }
+  .folder, .top b, .language-field, .rt-caption small, .rt-adapter,
+  .saved-nav i, .nodeoutput, .nodeoutput:before { color: var(--sub); }
+  .logo, .primary { background: #7654bd; color: white; }
+  .primary:hover:enabled { background: #8660cc; }
+  .headrow>span, .file b, .tools button:last-child, .model-results [aria-selected=true],
+  .panel-action, nav button[aria-selected=true] { color: var(--accent); }
+  .session[aria-current=true], .session-row[aria-current=true], .saved-nav[aria-current=true],
+  .settings-link[aria-current=true], .defaults button[aria-pressed=true], .choice-icon {
+    background: var(--wash);
+    color: var(--accent);
+  }
+  .session-row:hover, .session-more:hover, .model-results .highlight,
+  .model-results [role=option]:hover, .rt-picker [role=option]:hover,
+  .rt-picker [role=option].rt-active, .rt-picker button[role=combobox]:hover {
+    background: var(--raised);
+  }
+  .session-row[aria-current=true]:hover, .rt-picker [role=option][aria-selected=true],
+  .rt-picker button[role=combobox][aria-expanded=true] { background: var(--wash); }
+  .rt-picker [aria-selected=true] .rt-check:before { border-color: var(--accent); }
+
+  #stage, .board-scroll {
+    background-color: #1b1921;
+    background-image: radial-gradient(#393440 .8px, transparent .95px);
+  }
+  .node { background: var(--surface); border-color: #59525f; }
+  .node:hover:enabled { background: var(--raised); }
+  .node.active, .bnode.selected { border-color: var(--accent); }
+  .node.revised, .approval-card { border-color: var(--warning); }
+  .node.finished, .bnode.target { border-color: #75a68b; }
+  .nodestate { border-color: var(--line); }
+  .node.active .nodestate { color: var(--accent); }
+  .node.finished .nodestate, .connected .conn-state, .tl-step i { color: var(--success); }
+  .tl-step.running i { color: var(--accent); }
+  .bport, .bport-in { background: var(--surface); }
+  .bport:hover { background: var(--accent); }
+
+  .option, em, .output, .answer-md pre, .asset-link, .features span, .flow-roles span,
+  .build-tabs, .build-tabs .selected, .parent-checks label, .dep-chip, .project-tree,
+  .attachment-chip img, .approval-card pre { background: var(--raised); color: var(--ink); }
+  .attachbox { background: var(--inset); border-color: var(--line); }
+  .attachbox.over { background: var(--wash); border-color: var(--accent); }
+  .board-panel textarea, .redo-box textarea { border-color: var(--line); }
+  .io section { background: #252833; border-color: #444b60; }
+  .io section:last-child { background: #212d27; border-color: #3d5748; }
+  .io h3 { color: #bfc6eb; }
+  .io section:last-child h3, .document-inline>button, .file-token { color: var(--success); }
+  .document-inline, .redo-box { border-color: #466251; }
+  .gap-note, .approval-elsewhere { color: var(--warning); background: #362d21; }
+  .approval-card header span { color: var(--warning); }
+  .form-error, .danger, .row-menu .danger, .tl-step.failed i, .tl-step.failed span,
+  .bnode.incomplete b, .drop-node, .error-note { color: var(--danger); }
+  .error-note { background: #3b262b; }
+  .danger[data-armed], .row-menu .danger[data-armed] { background: #92443f; color: white; }
+  #notice { background: #e8e2ef; color: #211b2a; }
+
+  #answer, #answerHandle {
+    --dock-ink: #e4eee8;
+    --dock-muted: #b1c4b8;
+    --dock-rule: #405147;
+    background: #202723;
+    border-color: var(--dock-rule);
+  }
+  .dock-header, #answer .result-asset, .dock-doc { background: #242e28; }
+  #answerHandle.delivered, #answerHandle:hover, .dock-mark,
+  #answerClose:hover, .dock-copy:hover, .dock-author:hover {
+    background: #304037;
+    color: var(--success);
+    border-color: var(--dock-rule);
+  }
+  #answer .result-asset button { background: #26322b; }
+  .dock-author { color: var(--dock-muted); }
+  .dock-reply .answer-md { color: var(--dock-ink); }
+}

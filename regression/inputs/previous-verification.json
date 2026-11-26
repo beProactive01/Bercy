@@ -1,0 +1,116 @@
+{
+  "build": "Bercy-0.1.5-arm64.dmg",
+  "sha256": "6875560139d85aa4fb5397c52c56361c75c3a1e5c06ef781f23e305a27dc867f",
+  "unitTests": {
+    "passed": 78,
+    "consecutiveRuns": 3
+  },
+  "audits": [
+    {
+      "id": "05530ac3-249a-4648-ba8e-6598933dc829",
+      "inputRows": 40,
+      "uniqueRepositories": 40,
+      "perDay": {
+        "2026-11-19": 5,
+        "2026-11-20": 5,
+        "2026-11-21": 5,
+        "2026-11-22": 5,
+        "2026-11-23": 5,
+        "2026-11-24": 5,
+        "2026-11-25": 5,
+        "2026-11-26": 5
+      },
+      "nodes": [
+        "repo_stats",
+        "independent_review"
+      ],
+      "planVersions": 1,
+      "reviewBody": "交付的核对结果如下：\n\ndaily_repo_stats.csv 文件包含日期、每日原始记录数和截至当日累计唯一仓库数，数据完全符合要求，行数和唯一仓库数正确递增。\n\n周报正文段落：\n2026 年 11 月 19 日至 26 日，GitHub 项目推荐台账每日收录 5 条记录，8 天共计 40 行数据（不含表头）。按 repo_id 去重后，共收录 40 个唯一仓库。跨日重复仓库：无。\n\n附件：\n- /tmp/bercy-release.5dLUEU/profile/runs/0ff5a55d-7b99-47af-89eb-4b9f96cfe96d/out/daily_repo_stats.csv\n\n核对确认 CSV 与周报数据一致，未发现差异，符合所有交付标准。"
+    },
+    {
+      "id": "5fe9837f-3598-4a4d-9acd-e6ef0316dda9",
+      "inputRows": 33,
+      "uniqueRepositories": 33,
+      "perDay": {
+        "2026-11-19": 4,
+        "2026-11-20": 4,
+        "2026-11-21": 4,
+        "2026-11-22": 4,
+        "2026-11-23": 5,
+        "2026-11-24": 4,
+        "2026-11-25": 4,
+        "2026-11-26": 4
+      },
+      "nodes": [
+        "count_rows",
+        "verify_counts"
+      ],
+      "planVersions": 1,
+      "reviewBody": "按用户原始材料（共33条数据行）逐日统计及去重 repo_id 结果如下：\n\n日期          | 原始行数  \n------------- | --------  \n2026-11-19    | 4  \n2026-11-20    | 4  \n2026-11-21    | 4  \n2026-11-22    | 4  \n2026-11-23    | 5  \n2026-11-24    | 4  \n2026-11-25    | 4  \n2026-11-26    | 4  \n\n合计原始行数：33  \n跨日期去重的 repo_id 数：33  \n\n审计结论：通过。  \n\n以上结果仅基于用户原始请求中粘贴的 CSV 数据行，不存在缺口，且数据一致。"
+    }
+  ],
+  "pendingInputRecovery": {
+    "initial": "待补件",
+    "final": "已交付",
+    "result": "选中的工作流名称：示例 · 深夜电台开场  \n新建任务按钮文字：新建任务"
+  },
+  "crossReview": {
+    "producer": "Codex",
+    "reviewer": "Pi",
+    "limit": 80,
+    "characters": 51,
+    "result": "各位内测同事，源码版本为0.1.5，本机安装0.1.4，71项回归测试通过，0.1.5安装体验待核验。"
+  },
+  "browserOffline": [
+    {
+      "a": "71",
+      "b": "71",
+      "expect": "100.0%",
+      "value": "100.0%",
+      "ok": true
+    },
+    {
+      "a": "7",
+      "b": "8",
+      "expect": "87.5%",
+      "value": "87.5%",
+      "ok": true
+    },
+    {
+      "a": "0",
+      "b": "0",
+      "expect": "暂无数据",
+      "value": "暂无数据",
+      "ok": true
+    },
+    {
+      "a": "8",
+      "b": "7",
+      "expect": "输入错误",
+      "value": "输入错误",
+      "ok": true
+    }
+  ],
+  "finder": [
+    {
+      "name": "测试通过率计算器.html",
+      "path": "/private/tmp/bercy-accept.cWMlJm/profile/runs/a20f7199-ff7e-49d5-a71c-13acd1e9bc44/out/测试通过率计算器.html",
+      "label": "在 Finder 中显示",
+      "selected": "/private/tmp/bercy-accept.cWMlJm/profile/runs/a20f7199-ff7e-49d5-a71c-13acd1e9bc44/out/测试通过率计算器.html",
+      "pass": true
+    },
+    {
+      "name": "Bercy 内测复盘.ics",
+      "path": "/private/tmp/bercy-accept.cWMlJm/profile/runs/8f6bfde0-3e91-4a5b-ac87-c70d44bf03f0/out/Bercy 内测复盘.ics",
+      "label": "在 Finder 中显示",
+      "selected": "/private/tmp/bercy-accept.cWMlJm/profile/runs/8f6bfde0-3e91-4a5b-ac87-c70d44bf03f0/out/Bercy 内测复盘.ics",
+      "pass": true
+    }
+  ],
+  "sourceDesktopSessions": 16,
+  "finalImageSessions": 4,
+  "raw": {
+    "desktop": "/tmp/bercy-accept.cWMlJm/result.json",
+    "mountedImage": "/private/tmp/bercy-release.5dLUEU/result.json"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+build/
+.DS_Store
+.claude/
+# Source recordings for the README demos; too large for the repository
+docs/films/

@@ -1,0 +1,192 @@
+#workspace {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  container: workarea / inline-size;
+}
+.work-surface {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+#answer, #answerHandle {
+  --dock-ink: #262d29;
+  --dock-muted: #617169;
+  --dock-rule: #dce4df;
+  color: var(--dock-ink);
+}
+#answer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: var(--answer-width, clamp(435px, 53cqw, 800px));
+  min-width: min(320px, 85cqw);
+  max-width: min(1040px, calc(100cqw - 275px));
+  min-height: 0;
+  background: #fdfefd;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid #cbd8cf;
+  box-shadow: -3px 0 10px #24362806;
+  overflow: hidden;
+  animation: dock-arrive 180ms ease-out both;
+}
+#answerResize {
+  position: absolute;
+  z-index: 1;
+  inset: 0 auto 0 0;
+  width: 12px;
+  display: grid;
+  place-items: center;
+  cursor: col-resize;
+  touch-action: none;
+}
+#answerResize::before {
+  content: "";
+  width: 3px;
+  height: 42px;
+  border-radius: 4px;
+  background: var(--dock-rule);
+}
+#answerResize:hover::before, #answerResize:focus-visible::before, #answerResize.dragging::before {
+  background: var(--dock-muted);
+}
+#answer #answerResize:focus-visible { outline-offset: -2px }
+#answerHandle {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  top: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 5px 13px;
+  width: 32px;
+  border: 1px solid #d9d7df;
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  background: #fff;
+  box-shadow: -2px 2px 6px #302a410b;
+}
+#answerHandle span {
+  writing-mode: vertical-rl;
+  letter-spacing: .12em;
+  font-size: 13px;
+  font-weight: 550;
+}
+#answerHandle.delivered { background: #edf6ef; border-color: #c3d9ca; color: #326249 }
+#answerHandle:hover { background: #e9f1ed }
+.dock-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 10px 17px 10px 21px;
+  background: #f3f8f4;
+  border-bottom: 1px solid var(--dock-rule);
+}
+.dock-header h2 { font-size: 17px; font-weight: 650; letter-spacing: .01em }
+.dock-mark {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  color: #386851;
+  border: 1px solid #cfdfd3;
+  background: #e4f0e6;
+  border-radius: 9px;
+}
+.dock-mark svg { width: 20px; height: 20px }
+#answerClose, .dock-copy {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  color: var(--dock-muted);
+}
+#answerClose { margin-left: auto }
+#answerClose:hover, .dock-copy:hover, .dock-author:hover { background: #e6ede8 }
+#answerHandle svg, #answerClose svg { width: 19px; height: 19px }
+#answerContent {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 22px clamp(16px, 2.1cqw, 28px) 32px;
+  overflow-wrap: anywhere;
+}
+.dock-byline, .dock-author { display: flex; align-items: center }
+.dock-byline { justify-content: space-between; gap: 8px; margin-bottom: 8px }
+.dock-author {
+  gap: 6px;
+  padding: 2px 6px 2px 0;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #526158;
+}
+.dock-author canvas { width: 25px; height: 24px; object-fit: contain; image-rendering: pixelated }
+.dock-copy svg { width: 16px; height: 16px }
+.dock-reply h3 { margin: 0 0 15px; font-size: 21px; font-weight: 650; line-height: 1.4; letter-spacing: -.025em }
+.dock-reply + .dock-reply, .dock-media { margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--dock-rule) }
+.dock-reply .answer-md { font-size: 15px; line-height: 1.8; color: #303a34 }
+.dock-reply .answer-md > :first-child { margin-top: 0 }
+.dock-reply .answer-md > :last-child { margin-bottom: 0 }
+.dock-reply .answer-md img { display: block; max-width: 100%; max-height: 72vh; margin: 12px auto }
+.dock-images { display: grid; gap: 16px; margin: 18px 0 }
+.dock-image { margin: 0; min-width: 0 }
+.dock-image button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--dock-rule);
+  border-radius: 9px;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.dock-image button:hover { border-color: var(--dock-muted) }
+.dock-image img { display: block; width: 100%; max-height: 72vh; object-fit: contain }
+.dock-image figcaption { margin: 6px 0 0; font-size: 12px; color: var(--dock-muted) }
+.dock-media h3 { font-size: 14px; margin: 0 0 10px }
+#answer .result-attachments { margin-top: 15px; grid-template-columns: 1fr }
+#answer .dock-media .result-attachments { grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); align-items: start }
+#answer .result-asset { border-color: var(--dock-rule); background: #f5f7f5 }
+#answer .result-asset button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px; background: white }
+#answer .result-asset img, #answer .result-asset video { max-height: 290px }
+.dock-detail { border-top: 1px solid var(--dock-rule); margin-top: 23px; padding-top: 13px; font-size: 13px; color: var(--dock-muted) }
+.dock-detail summary { width: fit-content; cursor: pointer }
+.dock-brief p { margin: 10px 0; line-height: 1.65; white-space: pre-wrap }
+.dock-pending h3 { font-size: 16px; margin: 6px 0 15px }
+.dock-pending progress { width: 100%; height: 5px; display: block; accent-color: #688775 }
+.dock-pending p { font-size: 13px; color: var(--dock-muted); margin: 8px 0 0 }
+#answer :focus-visible, #answerHandle:focus-visible { outline: 2px solid #6751c4; outline-offset: 2px }
+#workspace:has(#answer:not([hidden])) #stage { container-type: inline-size }
+#workspace:has(#answer:not([hidden])) .node { width: clamp(132px, 19cqw, 240px) }
+#workspace:has(#answer:not([hidden])) .nodetop b { font-size: 14px }
+/* Narrow cards keep the role name on one line: a smaller avatar leaves room for three CJK characters. */
+#workspace:has(#answer:not([hidden])) .node .sprite { width: 29px; height: 26px }
+#workspace:has(#answer:not([hidden])) .node { padding: 10px }
+
+@container workarea (max-width: 820px) {
+  #answer {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: var(--answer-width, min(620px, 92cqw));
+    max-width: calc(100cqw - 26px);
+    box-shadow: -6px 0 24px #28362c18;
+  }
+}
+@keyframes dock-arrive { from { opacity: .6; transform: translateX(12px) } to { opacity: 1; transform: none } }
+@media (prefers-reduced-motion: reduce) { #answer { animation: none } }
+
+.dock-doc{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0;background:#fff}.dock-doc-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:var(--sub)}.dock-doc-head button{font-size:12px;color:var(--accent)}.dock-doc .document-body{font-size:14px;max-height:none}.dock-note{font-size:12.5px;color:var(--sub);margin-top:8px}.dock-file{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0;font-size:13px}
+.dock-gaps{margin-top:18px;font-size:13px}.dock-gaps ul{margin:6px 0 0;padding-left:18px}.dock-gaps li{margin:3px 0}

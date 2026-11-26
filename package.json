@@ -1,0 +1,52 @@
+{
+  "name": "bercy",
+  "productName": "Bercy",
+  "version": "0.1.14",
+  "private": true,
+  "license": "MIT",
+  "description": "本地多 Agent 工作流客户端",
+  "author": "beProactive01",
+  "homepage": "https://github.com/beProactive01/Bercy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beProactive01/Bercy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/beProactive01/Bercy/issues"
+  },
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "prestart": "node node_modules/electron/install.js",
+    "test": "node --test desktop/test/*.test.cjs",
+    "package:mac": "electron-builder --mac dmg --arm64",
+    "test:regression": "node regression/run.mjs"
+  },
+  "dependencies": {
+    "markdown-it": "14.1.0"
+  },
+  "devDependencies": {
+    "electron": "43.6.0",
+    "electron-builder": "26.8.1"
+  },
+  "build": {
+    "appId": "app.bercy.desktop",
+    "productName": "Bercy",
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "desktop/*.cjs",
+      "desktop/planning-guide*.md",
+      "dist/**/*",
+      "package.json"
+    ],
+    "artifactName": "Bercy-${version}-${arch}.${ext}",
+    "mac": {
+      "icon": "desktop/icon.png",
+      "identity": "-",
+      "notarize": false,
+      "category": "public.app-category.productivity"
+    }
+  }
+}

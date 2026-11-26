@@ -1,0 +1,523 @@
+[
+  {
+    "id": "translation",
+    "group": "business",
+    "prompt": "翻译成一条面向英国同事的英文维护通知：11 月 30 日北京时间 22:15 至 22:45 期间仅暂停导出。登录和浏览照常。请保留北京时间，不承诺提前恢复。只给英文正文。",
+    "inputs": [],
+    "accept": "包含 30 Nov、22:15 和 22:45 北京时间，仅导出暂停，登录和浏览可用；无额外承诺。"
+  },
+  {
+    "id": "handover",
+    "group": "business",
+    "prompt": "把这段会议实录整理成群里可发的行动表，按事项列出负责人和截止时间。阿莲：我周五 18:00 前补验收数据。小齐：我接过发布稿，原定周四，改到下周一 12:00。主持人：回滚演练还没人认领，也没定时间。不能自行补人或日期。",
+    "inputs": [],
+    "accept": "三件事，保留两项明确负责人和最后截止时间，回滚负责人、时间都待定。"
+  },
+  {
+    "id": "timezone",
+    "group": "business",
+    "prompt": "安排 2026-11-30 的 60 分钟会议。纽约当天 UTC-5，可用 08:00–10:00；伦敦 UTC+0，可用 13:00–15:00；新加坡 UTC+8，可用 20:30–22:00。候选 UTC 开始时间只有 12:30、13:00、13:30。只推荐所有人均能完整参加的一档，给出三地本地起止时间。无需创建邀请。",
+    "inputs": [],
+    "accept": "仅 13:00 UTC；纽约 08–09、伦敦 13–14、新加坡 21–22。"
+  },
+  {
+    "id": "refunds",
+    "group": "business",
+    "prompt": "财务在核对两份附件。按 event_id 去除完全重复的退款事件，逐订单生成一个 UTF-8 CSV。表头严格为 order_id,customer,paid_cents,refund_cents,net_cents。订单号保留前导零，客户名原样保留。正文给合计净额（分）。交付 CSV 文件。",
+    "inputs": [
+      "payments.csv",
+      "refunds.csv"
+    ],
+    "accept": "三行，客户名与订单号原样；净额分别 8000、0、100 分，合计 8100 分。"
+  },
+  {
+    "id": "visual",
+    "group": "business",
+    "prompt": "会议室看板的每格代表从标注时间开始的半小时，蓝色表示占用。请只根据截图找出 09:00–11:30 之间能连续预约一整小时的所有房间和时段。",
+    "inputs": [
+      "room-board.png"
+    ],
+    "accept": "仅 Maple 10:00–11:00；Cedar 和 Birch 均无连续两格空闲。"
+  },
+  {
+    "id": "pdf",
+    "group": "business",
+    "prompt": "读取附件里的工作坊通知，给参会者写一句英文提醒，列出已批准的开始时间、房间、携带物，并在末尾标注页码。两页冲突时按批准版本。",
+    "inputs": [
+      "retreat-brief.pdf"
+    ],
+    "accept": "仅采用第 2 页 Rev B：09:40、Cedar 307、laptop 和 charger；标页码。"
+  },
+  {
+    "id": "ids",
+    "group": "business",
+    "prompt": "把三条记录转成纯 JSON 数组，保留顺序。id、order 均作为字符串，note 空值用 null。原始行用竖线分隔：9007199254740993|0007|重试；9007199254740995|0008|；100|0010|OK。不要用 Markdown 包裹。",
+    "inputs": [],
+    "accept": "可直接 JSON.parse，精确匹配类型、顺序、三个 ID、三个前导零订单号和 null。"
+  },
+  {
+    "id": "srt",
+    "group": "business",
+    "prompt": "给录播课统一延后字幕 1.250 秒。请改附件里的所有起止时间，保留序号、所有正文（含多行）和标准 SRT 毫秒格式。只交付一个新的 .srt 文件。",
+    "inputs": [
+      "recording.srt"
+    ],
+    "accept": "3 段、6 个时间端点逐个 +1250ms，跨分钟和跨小时进位正确，逐行字幕不变。"
+  },
+  {
+    "id": "capacity",
+    "group": "business",
+    "prompt": "给工作坊排座。三个房间 A、B、C 的容量依次为 6、6、4。G1 到 G6 的人数依次为 4、3、3、2、2、2。每组只能放一个房间，每人有座。只输出 JSON 对象，键为 A、B、C，值为组名数组。",
+    "inputs": [],
+    "accept": "纯 JSON，每组恰好一次，三间人数分别不超过 6、6、4。"
+  },
+  {
+    "id": "impossible",
+    "group": "business",
+    "prompt": "工作坊临时少一间房，现在只有两个 6 座房间。三组各 4 人，每组必须坐同一间，不加座也不拆组。请判断是否可行，给出能让负责人信服的最短理由。",
+    "inputs": [],
+    "accept": "不可行；每间最多容纳一组，两个房间只能容纳两组。"
+  },
+  {
+    "id": "excel",
+    "group": "business",
+    "prompt": "用附件生成一份报销试算表 .xlsx。单个工作表 A1:D1 为 item、quantity、price、amount，原始三条数据放 2–4 行。D2:D4 必须用对应行的数量乘单价公式，D5 用 SUM 汇总 D2:D4。金额两位小数，能直接改数量重算。请只交付工作簿。",
+    "inputs": [
+      "expenses.csv"
+    ],
+    "accept": "验证原始单元格、四个活动公式与金额格式；重算总数 461.60，B2 从4改5后总计489.10。"
+  },
+  {
+    "id": "copy",
+    "group": "business",
+    "prompt": "为周末领养日写三条中文海报标题，每行一条，每条含标点最多 10 个字符。三条开头分别用「来」「给」「让」，都不能出现“购买”“领养代替购买”。只交三行，不加序号。",
+    "inputs": [],
+    "accept": "严格三行，逐行长度、首字和禁用词全部满足，内容适合领养日。"
+  },
+  {
+    "id": "cli",
+    "group": "business",
+    "prompt": "写一个只依赖 Python 3 标准库的命令行脚本，文件名 sum_minutes.py。从标准输入逐行读取 JSON 对象，把每个 owner 的 minutes 相加。owner 必须是非空字符串，minutes 必须为非负整数（布尔值无效），坏 JSON 或非法行忽略。标准输出只有一个 JSON 对象，空输入返回 {}。交付可运行的 .py 文件。",
+    "inputs": [],
+    "accept": "独立执行空输入、坏 JSON、负数、布尔、中文姓名与重复姓名，检查 stdout 的 JSON 精确值。"
+  },
+  {
+    "id": "denominator",
+    "group": "business",
+    "prompt": "增长周报只收到以下信息：上周新增付费账号 120，本周 132；两周访问人数都缺失。请写给产品经理一句结论，明确数值上升了多少，以及能否判断付费转化率提高。",
+    "inputs": [],
+    "accept": "新增账号 +12 或 +10%，不能判断转化率提高，说明缺访问人数（分母）。"
+  },
+  {
+    "id": "volume",
+    "group": "business",
+    "prompt": "审计附件里的业务事件账本。先按 event_id 去掉重复的相同行，随后排除 status=void。按 region 统计有效事件数和 cents 总和，输出 CSV 附件，表头为 region,count,cents。让另一个节点从原始附件独立复算后给出核对结论。",
+    "inputs": [
+      "ledger-nov.csv"
+    ],
+    "accept": "全部地区的行数、分值与独立脚本精确相等；独立节点有原始附件，终态明确。"
+  },
+  {
+    "id": "release",
+    "group": "business",
+    "prompt": "技术支持要核实上一次 Bercy 验收包。仅使用附件，直接回复 DMG 的文件名、完整 SHA-256、单轮通过的测试数和连续通过轮数。不得把当前讨论里的最新信息冒充附件事实。",
+    "inputs": [
+      "previous-verification.json"
+    ],
+    "accept": "文件名、64位哈希、78 项和 3 轮与上轮实际验证文件完全一致。"
+  },
+  {
+    "id": "web",
+    "group": "business",
+    "prompt": "为新人手册核对一个引用。请实际打开 RFC Editor 的 RFC 2606 正文，给出第 2 节保留的全部顶级域名，并附指向该正文的来源链接。只写这四个域名和来源。",
+    "inputs": [],
+    "accept": "四个准确域名及 RFC Editor 原文链接；另核实运行记录能否证明取到了外部原文。"
+  },
+  {
+    "id": "reuse",
+    "group": "business",
+    "prompt": "请安排另一次 30 分钟区域例会。东京（UTC+9）可用 17:00–17:30，伦敦（UTC+0）可用 08:00–09:00，柏林（UTC+1）可用 09:00–09:30。日期是 2026-12-02。给出三地时间。",
+    "inputs": [],
+    "accept": "复用首轮排期流程结构，结果为东京17:00–17:30、伦敦08:00–08:30、柏林09:00–09:30；不沿用旧城市或时长。"
+  },
+  {
+    "id": "audio",
+    "group": "business",
+    "prompt": "给播客剪辑师一个校时音轨，交付 3.000 秒的 WAV，48 kHz、单声道、16 位 PCM。从 0 秒起每 0.5 秒一声 880 Hz 提示音，共 6 声，每声约 50 毫秒，其余静音。不要背景音乐、旁白或淡入片头。",
+    "inputs": [],
+    "accept": "解析 WAV 头和 144000 帧 PCM，以独立频谱和时间窗检查 6 声、间隔、880Hz、约50ms及静音区。"
+  },
+  {
+    "id": "pair",
+    "group": "business",
+    "prompt": "给工作坊协调人交付两个能分别下载的文件：一份 .ics，一份 UTF-8 .txt 参会须知。活动名 River Walk Lab，2026-12-03 新加坡时间 10:00–11:30，场地 Cedar 307，需自带水瓶；须知保留活动名、日期、时间、地点和水瓶提醒。日历和须知的信息要一致，不发送邀请。",
+    "inputs": [],
+    "accept": "两个独立文件；解析 VEVENT 的 DTSTART/DTEND、场地与标题，核对 TXT 的全部要素。"
+  },
+  {
+    "id": "race",
+    "group": "flow",
+    "prompt": "校样、印刷回执和总表的版号须保持一致，以审定版为准。各角色按岗位简述交付。",
+    "nodes": [
+      {
+        "id": "draft",
+        "name": "校样",
+        "description": "首轮只发校样编码 ALPHA-17；如果收到修改意见，则严格采用修改意见指定的新编码，只写编码。",
+        "deps": [],
+        "artifact": "校样",
+        "delivery": "text",
+        "preferred": "Codex"
+      },
+      {
+        "id": "review",
+        "name": "校对",
+        "description": "审核收到的校样正文。审定编码是 BRAVO-42。看到旧编码 ALPHA-17 就使用退回协议，要求作者把编码改为 BRAVO-42；收到 BRAVO-42 则只返回 BRAVO-42。",
+        "deps": [
+          "draft"
+        ],
+        "artifact": "校对",
+        "delivery": "text",
+        "preferred": "Codex",
+        "review": true
+      },
+      {
+        "id": "press",
+        "name": "印刷回执",
+        "description": "逐字记录实际收到的校样编码。请运行 shell 命令 sleep 30 模拟印刷处理延时，等待命令结束再交付你实际收到的编码，不自行改号。",
+        "deps": [
+          "draft"
+        ],
+        "artifact": "印刷回执",
+        "delivery": "text",
+        "preferred": "Codex",
+        "needs": [
+          "shell"
+        ]
+      },
+      {
+        "id": "assemble",
+        "name": "总表",
+        "description": "只忠实抄录两份上游的实际正文，输出 JSON，review 和 press 分别填写校对稿及印刷回执的编码。两者不同也保留原值。",
+        "deps": [
+          "review",
+          "press"
+        ],
+        "artifact": "总表",
+        "delivery": "text",
+        "preferred": "Codex"
+      }
+    ],
+    "accept": "必须触发退回，使用旧输入的印刷分支须重新取稿；最终两个编码都为 BRAVO-42。"
+  },
+  {
+    "id": "join",
+    "group": "flow",
+    "prompt": "把两个独立生成的批次编号合成一份交接表，逐字保留上游实值。",
+    "nodes": [
+      {
+        "id": "left",
+        "name": "东仓凭据",
+        "description": "使用命令 uuidgen 生成一个新 UUID，原样写到输出目录 east.txt，只交付这个文件。",
+        "deps": [],
+        "artifact": "东仓凭据",
+        "delivery": "file",
+        "preferred": "Codex",
+        "needs": [
+          "shell"
+        ]
+      },
+      {
+        "id": "right",
+        "name": "西仓凭据",
+        "description": "使用命令 uuidgen 生成一个新 UUID，正文只写这个 UUID。",
+        "deps": [],
+        "artifact": "西仓凭据",
+        "delivery": "text",
+        "preferred": "Codex",
+        "needs": [
+          "shell"
+        ]
+      },
+      {
+        "id": "join",
+        "name": "交接表",
+        "description": "读取东仓凭据附件 east.txt 和西仓正文；输出纯 JSON 对象，east 和 west 是各自收到的原始 UUID。",
+        "deps": [
+          "left",
+          "right"
+        ],
+        "artifact": "交接表",
+        "delivery": "text",
+        "preferred": "Codex"
+      }
+    ],
+    "accept": "合并后的 east 和 west 与各自实际生成的 UUID 相同，附件 ID 传递一致。"
+  },
+  {
+    "id": "missing",
+    "group": "flow",
+    "prompt": "按协调人提供的提货码编制交接回执。未知值需要补件。",
+    "nodes": [
+      {
+        "id": "source",
+        "name": "待核对的提货码",
+        "description": "若原始材料里没有具体的提货码，以“待补件：请提供提货码”回复；补充后只输出确切提货码。",
+        "deps": [],
+        "artifact": "待核对的提货码",
+        "delivery": "text",
+        "preferred": "Codex"
+      },
+      {
+        "id": "receipt",
+        "name": "提货回执",
+        "description": "只抄录上游实际提交的提货码。",
+        "deps": [
+          "source"
+        ],
+        "artifact": "提货回执",
+        "delivery": "text",
+        "preferred": "Codex"
+      }
+    ],
+    "accept": "补件前下游未启动；补入 TK-80417 后下游接收到同一提货码。"
+  },
+  {
+    "id": "retry",
+    "group": "flow",
+    "prompt": "登记左右工位的质检口令，两份均到后做交接。",
+    "nodes": [
+      {
+        "id": "steady",
+        "name": "甲工位",
+        "description": "只回 A-314。",
+        "deps": [],
+        "artifact": "甲工位",
+        "delivery": "text",
+        "preferred": "Codex"
+      },
+      {
+        "id": "interrupted",
+        "name": "乙工位",
+        "description": "先执行 sleep 8 模拟等待设备，再只回 B-159。",
+        "deps": [],
+        "artifact": "乙工位",
+        "delivery": "text",
+        "preferred": "Codex",
+        "needs": [
+          "shell"
+        ]
+      },
+      {
+        "id": "receipt",
+        "name": "交接回执",
+        "description": "以一行输出来自两个上游的两个口令。",
+        "deps": [
+          "steady",
+          "interrupted"
+        ],
+        "artifact": "交接回执",
+        "delivery": "text",
+        "preferred": "Codex"
+      }
+    ],
+    "accept": "人为中断乙工位，重新运行；甲工位只运行一次，下游只在两者成功后收齐两个口令。"
+  },
+  {
+    "id": "exhausted",
+    "group": "flow",
+    "prompt": "旧库存接口的发布批次验收，只有合格的批次才能进入发布登记。",
+    "nodes": [
+      {
+        "id": "draft",
+        "name": "draft",
+        "artifact": "draft",
+        "description": "记录上游旧库存接口的不可变快照，原始数据 batch=staging。每轮如实返回 {\"batch\":\"staging\"}，不得替旧系统修改实际批次。",
+        "deps": [],
+        "delivery": "text",
+        "checks": {
+          "json": true,
+          "requiredKeys": [
+            "batch"
+          ]
+        }
+      },
+      {
+        "id": "review",
+        "name": "review",
+        "artifact": "review",
+        "description": "只允许 release 批次。上游 batch 为 staging 时始终回复“退回：批次仍是 staging，不能发布”，禁止作为通过。只有 release 才能交付原样 JSON。",
+        "deps": [
+          "draft"
+        ],
+        "delivery": "text",
+        "review": true,
+        "checks": {
+          "json": true,
+          "requiredKeys": [
+            "batch"
+          ]
+        }
+      },
+      {
+        "id": "publish",
+        "name": "publish",
+        "artifact": "publish",
+        "description": "仅抄录验收节点发来的完整正文作为记录。",
+        "deps": [
+          "review"
+        ],
+        "delivery": "text"
+      }
+    ],
+    "accept": "达到退回上限后仍不合格，必须停止放行且清晰标出失败或待处理；发布登记不得运行。"
+  },
+  {
+    "id": "stock-cli",
+    "group": "coding",
+    "prompt": "从零开发仓库库存核对 CLI，使用 Python 3 标准库。",
+    "nodes": [
+      {
+        "id": "implement",
+        "name": "implement",
+        "artifact": "implement",
+        "description": "实现 stock.py，可用 python3 stock.py 调用。stdin 是带 sku,delta 表头的 UTF-8 CSV。按 sku 汇总有符号整数 delta，跳过空 sku 和非整数字段；输出 JSON 对象，保留 SKU 前导零和含逗号的名称。空表输出 {}。",
+        "deps": [],
+        "delivery": "project",
+        "needs": [
+          "shell"
+        ],
+        "paths": [
+          "stock.py"
+        ]
+      },
+      {
+        "id": "test",
+        "name": "test",
+        "artifact": "test",
+        "description": "在 tests/ 添加 unittest 测试并实际运行；通过标准输入运行 stock.py 验证 CSV 引号、负数、坏行和空表。",
+        "deps": [
+          "implement"
+        ],
+        "delivery": "project",
+        "needs": [
+          "shell"
+        ],
+        "paths": [
+          "tests/"
+        ]
+      }
+    ],
+    "seed": null,
+    "accept": "从命令行黑盒运行空表、混合输入和带逗号 SKU；自动发现的开发者测试也必须通过。"
+  },
+  {
+    "id": "rounding",
+    "group": "coding",
+    "prompt": "修改已有的价格转换函数，修复小数边界。",
+    "nodes": [
+      {
+        "id": "fix",
+        "name": "fix",
+        "artifact": "fix",
+        "description": "保留 prices.to_cents(value: str) -> int。使用精确十进制运算，刚好半分向远离零方向舍入；支持大数。保留已有 tests/test_existing.py，新建 unittest 回归测试并运行。",
+        "deps": [],
+        "delivery": "project",
+        "needs": [
+          "shell"
+        ],
+        "paths": [
+          "prices.py",
+          "tests/"
+        ]
+      }
+    ],
+    "seed": "rounding",
+    "accept": "已有测试原样通过；正负半分、大数、零和非临界值准确；新增测试能识别旧实现。"
+  },
+  {
+    "id": "paging",
+    "group": "coding",
+    "prompt": "给现有目录 API 添加向后兼容的分页。",
+    "nodes": [
+      {
+        "id": "feature",
+        "name": "feature",
+        "artifact": "feature",
+        "description": "保留 catalog.list_items(items) 接口和顺序，新增仅关键字 offset=0、limit=None。先过滤 active，再分页，limit=0 为空；负 offset/limit 抛 ValueError。不能修改输入。保留旧测试，新建 unittest 测试并运行。",
+        "deps": [],
+        "delivery": "project",
+        "needs": [
+          "shell"
+        ],
+        "paths": [
+          "catalog.py",
+          "tests/"
+        ]
+      }
+    ],
+    "seed": "paging",
+    "accept": "旧调用结果不变；分页边界、顺序、输入完整性、非法值和仅关键字参数均通过。"
+  },
+  {
+    "id": "tests-only",
+    "group": "coding",
+    "prompt": "只补测试，不修改现有运费模块。",
+    "nodes": [
+      {
+        "id": "test",
+        "name": "test",
+        "artifact": "test",
+        "description": "为 postage.fee 写可被 python3 -m unittest discover -s tests 发现的测试。覆盖 500/501 和 1000/1001 克、会员优惠、非法重量（包括 True、零、负数和小数）。实际运行测试，只写 tests/ 内文件。",
+        "deps": [],
+        "delivery": "project",
+        "needs": [
+          "shell"
+        ],
+        "paths": [
+          "tests/"
+        ]
+      }
+    ],
+    "seed": "thresholds",
+    "accept": "原实现字节不变，测试在原实现通过，并分别抓到四个独立行为变异。"
+  },
+  {
+    "id": "fix-and-test",
+    "group": "coding",
+    "prompt": "仓库事件重复投递导致合计翻倍，请先用测试复现，再修复。",
+    "nodes": [
+      {
+        "id": "reproduce",
+        "name": "reproduce",
+        "artifact": "reproduce",
+        "description": "只编写 tests/test_duplicates.py，覆盖重复 id 的记录只计首次、不同 id 即使数值相同也都计入，以及跨仓同 id 也只计首次；首次记录可以是负数。请实际运行并保留红灯证据。此节点交付成果是可重复失败的测试，保持 events.py 不变。",
+        "deps": [],
+        "delivery": "project",
+        "needs": [
+          "shell"
+        ],
+        "paths": [
+          "tests/test_duplicates.py"
+        ]
+      },
+      {
+        "id": "repair",
+        "name": "repair",
+        "artifact": "repair",
+        "description": "阅读现有实现和上游新增的回归测试，修改 events.totals(events) 只按事件 id 保留首条，不改 tests。实际运行全量 unittest，给出绿灯结果。",
+        "deps": [
+          "reproduce"
+        ],
+        "delivery": "project",
+        "needs": [
+          "shell"
+        ],
+        "paths": [
+          "events.py"
+        ]
+      }
+    ],
+    "seed": "reconcile",
+    "accept": "复现节点实际运行出红灯；最终测试在修复版通过、在原版失败；独立输入检查跨仓、负数、同值不同 ID。"
+  }
+]
